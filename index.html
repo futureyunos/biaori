@@ -20,6 +20,7 @@
   --accent-tint: #e3e9fb;
   --accent-ink: #ffffff;
   --warn: #b3441f;
+  --r-card: 12px;
   --font-jp: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;
   --font-ui: "Noto Sans SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif;
 }
@@ -52,7 +53,7 @@ body::before {
 
 header.bar {
   position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5;
-  background: var(--bar); border-bottom: 1px solid var(--line);
+  background: var(--bar); border-bottom: 1px solid var(--line); border-radius: 0 0 var(--r-card) var(--r-card);
   margin-inline: calc(-1 * max(16px, env(safe-area-inset-left, 0px))) calc(-1 * max(16px, env(safe-area-inset-right, 0px)));
   padding: 10px max(16px, env(safe-area-inset-right, 0px)) 10px max(16px, env(safe-area-inset-left, 0px));
 }
@@ -95,7 +96,7 @@ ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: col
 
 .row {
   width: 100%; text-align: left; font: inherit; color: inherit; cursor: pointer;
-  background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+  background: var(--card); border: 1px solid var(--line); border-radius: var(--r-card);
   padding: 12px 14px; display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; align-items: center;
   transition: background calc(.15s * var(--am, 1)), border-color calc(.15s * var(--am, 1));
 }
@@ -126,6 +127,11 @@ ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: col
 .sw { width: 34px; height: 34px; border-radius: 50%; border: 2px solid var(--line); cursor: pointer; padding: 0; position: relative; }
 .sw[aria-pressed="true"] { border-color: var(--ink); box-shadow: 0 0 0 2px var(--card) inset; }
 .sw span { position: absolute; inset: 0; border-radius: 50%; }
+.sw-custom { position: relative; width: 34px; height: 34px; border-radius: 50%; border: 2px solid var(--line); cursor: pointer; overflow: hidden; display: block; }
+.sw-custom[data-on="1"] { border-color: var(--ink); box-shadow: 0 0 0 2px var(--card) inset; }
+.sw-custom i { position: absolute; inset: 0; border-radius: 50%; background: conic-gradient(#e0405a, #f0a030, #f0e040, #40c070, #30a0e0, #6a4fb3, #e0405a); }
+.sw-custom[data-on="1"] i { background: var(--cc); }
+.sw-custom input { position: absolute; inset: -6px; width: 150%; height: 150%; opacity: 0; cursor: pointer; padding: 0; border: 0; }
 .sw-l { font-size: 11px; color: var(--ink-soft); text-align: center; width: 44px; }
 .sw-w { display: flex; flex-direction: column; align-items: center; gap: 3px; }
 .st-demo { font-family: var(--font-jp); font-size: 26px; padding: 10px 4px 4px; }
@@ -237,11 +243,7 @@ html.noswitch .tg .sw-in:checked::after { transform: translateX(18px); }
 .tg[aria-checked="true"] i::after { transform: translateX(18px); }
 .off-speed .seg[aria-label="语速"], .off-tJp #tJp, .off-tKanji #tKanji, .off-tZh #tZh, .off-tPitch #tPitch, .off-tRom #tRom, .off-tGj #tGj, .off-playAll #playAll { display: none !important; }
 
-.rg { -webkit-appearance: auto; appearance: auto; width: 100%; margin: 6px 0; accent-color: var(--accent); }
-.rg::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; background: var(--line); }
-.rg::-moz-range-track { height: 4px; border-radius: 2px; background: var(--line); }
-.rg::-webkit-slider-thumb { -webkit-appearance: none; width: 26px; height: 26px; margin-top: -11px; border-radius: 50%; background: #fff; border: 0; box-shadow: 0 1px 4px rgba(0,0,0,.35), 0 0 0 1px rgba(0,0,0,.05); }
-.rg::-moz-range-thumb { width: 26px; height: 26px; border-radius: 50%; background: #fff; border: 0; box-shadow: 0 1px 4px rgba(0,0,0,.35); }
+.rg { -webkit-appearance: auto; appearance: auto; display: block; width: 100%; height: 44px; margin: 0; padding: 0; background: transparent; accent-color: var(--accent); touch-action: pan-y; }
 .rg:disabled { opacity: .4; }
 .rv { float: right; color: var(--accent); font-weight: 500; font-variant-numeric: tabular-nums; }
 
@@ -272,38 +274,68 @@ body.cols-4 { --cols: 4; --maxw: 1900px; }
 .gj > *, .gj-bg.on .gj > *, .gj-bg .gj > * { opacity: 1 !important; transition: none !important; }
 .jp-float { position: fixed; top: calc(env(safe-area-inset-top, 0px) + 8px); right: max(12px, env(safe-area-inset-right, 0px)); z-index: 7; }
 /* compact mode (top bar only): one row of tiny one-character buttons, two lesson pills at a time, no lesson title */
-body.compact header.bar { padding: 5px max(8px, env(safe-area-inset-right, 0px)) 5px max(8px, env(safe-area-inset-left, 0px)); }
-body.compact .bar-inner { flex-direction: row; align-items: center; gap: 4px; max-width: none; }
+/* sizes come from variables so each device / orientation can set its own button size and spacing */
+body.compact { --cb: 28px; --cw: 27px; --cg: 4px; --cfs: 12px; --cpx: 6px; --cpy: 5px; }
+body.compact header.bar { padding: var(--cpy) max(8px, env(safe-area-inset-right, 0px)) var(--cpy) max(8px, env(safe-area-inset-left, 0px)); }
+body.compact .bar-inner { flex-direction: row; align-items: center; gap: var(--cg); max-width: none; }
 body.compact .title { order: 9; margin-left: auto; flex: none; }
 body.compact #hTitle, body.compact #hJp { display: none; }
-body.compact .gear { width: 26px; height: 26px; }
+body.compact .gear { width: var(--cb); height: var(--cb); }
 body.compact .gear svg { width: 15px; height: 15px; }
 body.compact .lessons { flex: none; max-width: 80px; margin: 0; padding: 2px 3px; gap: 4px; scroll-snap-type: x proximity; }
 body.compact .lessons button { min-width: 36px; height: 24px; padding: 0; font-size: 12px; scroll-snap-align: start; }
 body.compact .pill-ind { top: 2px; height: 24px; }
-body.compact .controls { flex: 1 1 auto; min-width: 0; flex-wrap: nowrap; gap: 3px; overflow-x: auto; scrollbar-width: none; }
+body.compact .controls { flex: 1 1 auto; min-width: 0; flex-wrap: nowrap; gap: var(--cg); overflow-x: auto; scrollbar-width: none; }
 body.compact .controls::-webkit-scrollbar { display: none; }
-body.compact header.bar .chip, body.compact header.bar .seg button, body.compact .jp-float { font-size: 0; padding: 2px 6px; min-height: 24px; min-width: 24px; line-height: 1; flex: none; }
-body.compact header.bar .seg { height: 24px; flex: none; }
-body.compact header.bar .chip::after, body.compact header.bar .seg button[id]::after, body.compact .jp-float::after { font-size: 12px; }
+body.compact header.bar .chip, body.compact header.bar .seg button, body.compact .jp-float { font-size: 0; padding: 0 var(--cpx); min-height: var(--cb); min-width: var(--cw); line-height: 1; flex: none; }
+body.compact header.bar .seg { height: var(--cb); flex: none; }
+body.compact header.bar .chip::after, body.compact header.bar .seg button[id]::after, body.compact .jp-float::after { font-size: var(--cfs); }
 body.compact #slow::after { content: '慢'; } body.compact #norm::after { content: '常'; }
 body.compact #tJp::after { content: '日'; } body.compact #tKanji::after { content: '汉'; } body.compact #tZh::after { content: '中'; }
 body.compact #tPitch::after { content: '调'; } body.compact #tRom::after { content: 'A'; } body.compact #tGj::after { content: 'あ'; }
 body.compact #playAll { margin-left: 0; }
-body.compact #playAll::after { content: '▶'; } body.compact #playAll.on::after { content: '❚❚'; font-size: 10px; letter-spacing: -1px; }
-body.compact #tCols button { font-size: 12px; padding: 2px 6px; }
+body.compact #playAll::after { content: '▶'; } body.compact #playAll.on::after { content: '❚❚'; font-size: calc(var(--cfs) - 2px); letter-spacing: -1px; }
+body.compact #tCols button { font-size: var(--cfs); padding: 0 var(--cpx); min-width: var(--cw); }
 body.compact .status { display: none; }
 body.compact .jp-float { top: calc(env(safe-area-inset-top, 0px) + 6px); }
+/* phone held sideways: the bar is short and wide, so buttons get bigger and more room between them */
+@media (orientation: landscape) and (max-height: 500px) {
+  body.compact { --cb: 36px; --cw: 40px; --cg: 9px; --cfs: 15px; --cpx: 12px; --cpy: 4px; }
+  header.bar { padding-top: 6px; padding-bottom: 6px; }
+  body:not(.compact) .chip, body:not(.compact) .seg button { min-height: 36px; }
+  body:not(.compact) header.bar .controls { gap: 8px; }
+}
+/* tablets / desktop */
+@media (min-width: 700px) and (min-height: 501px) {
+  body.compact { --cb: 34px; --cw: 38px; --cg: 8px; --cfs: 14px; --cpx: 11px; --cpy: 6px; }
+}
+/* touch: keep a 44pt tap area around each small header button without changing how it looks */
+@media (pointer: coarse) {
+  header.bar .chip, header.bar .gear, header.bar .seg button { position: relative; }
+  header.bar .chip::before, header.bar .gear::before { content: ""; position: absolute; left: calc(var(--cg, 8px) / -2); right: calc(var(--cg, 8px) / -2); top: -6px; bottom: -6px; min-height: 44px; }
+  body.compact header.bar .chip::before, body.compact header.bar .gear::before { top: calc((44px - var(--cb)) / -2); bottom: calc((44px - var(--cb)) / -2); }
+  header.bar .seg button::before { content: ""; position: absolute; left: 0; right: 0; top: -6px; bottom: -6px; }
+}
 #lessons { display: none !important; }
 .chip.lsel { font-weight: 700; color: var(--accent); min-width: 78px; display: inline-flex; align-items: center; justify-content: center; text-align: center; }
-body.compact header.bar .chip.lsel { font-size: 12px; min-width: 34px; padding: 2px 8px; }
+body.compact header.bar .chip.lsel { font-size: var(--cfs); min-width: calc(var(--cw) + 8px); padding: 0 var(--cpx); }
 .seg[aria-label="语速"] button { min-width: 56px; text-align: center; }
-body.compact header.bar .seg[aria-label="语速"] button { min-width: 26px; }
+body.compact header.bar .seg[aria-label="语速"] button { min-width: var(--cw); }
 .lrow { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; font: inherit; color: var(--ink); background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-bottom: 8px; cursor: pointer; }
 .lrow b { flex: none; min-width: 3.2em; color: var(--accent); }
 .lrow span { font-family: var(--font-jp); color: var(--ink-soft); min-width: 0; overflow-wrap: anywhere; }
 .lrow[aria-pressed="true"] { background: var(--accent-tint); border-color: var(--accent); }
 header.bar { will-change: transform; transition: transform var(--bd, .6s) cubic-bezier(.45,.05,.25,1), background-color calc(.35s * var(--am, 1)) ease, border-color calc(.35s * var(--am, 1)) ease; }
+.lockb { position: fixed; right: max(14px, env(safe-area-inset-right, 0px)); bottom: calc(env(safe-area-inset-bottom, 0px) + 16px); z-index: 6; width: 44px; height: 44px; padding: 0; border-radius: 50%; border: 1px solid var(--line); background: var(--bar); color: var(--ink-soft); display: grid; place-items: center; cursor: pointer; opacity: 0; visibility: hidden; pointer-events: none; transform: scale(.55) translateY(14px); box-shadow: 0 2px 10px rgba(0,0,0,.14);
+  transition: opacity calc(.3s * var(--am, 1)), transform calc(.45s * var(--am, 1)) cubic-bezier(.2,1.25,.3,1), visibility 0s calc(.45s * var(--am, 1)), background calc(.3s * var(--am, 1)), color calc(.3s * var(--am, 1)), border-color calc(.3s * var(--am, 1)); }
+.lockb.on { opacity: .94; visibility: visible; pointer-events: auto; transform: none; transition-delay: 0s; }
+.lockb[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.lockb svg { width: 22px; height: 22px; overflow: visible; }
+.lockb .shk { transform-box: fill-box; transform-origin: 100% 100%; transition: transform calc(.4s * var(--am, 1)) cubic-bezier(.3,1.4,.4,1); transform: translate(0, -3px) rotate(-28deg); }
+.lockb[aria-pressed="true"] .shk { transform: none; }
+body.lockshow { padding-bottom: 76px; }
+html.apple .lockb { -webkit-backdrop-filter: blur(16px) saturate(1.6); backdrop-filter: blur(16px) saturate(1.6); }
+html.apple .lockb:not([aria-pressed="true"]) { background: var(--glass-bg, var(--bar)); }
 header.bar.bar-hid { transform: translate3d(0, calc(-100% - 2px), 0); }
 
 /* Apple devices (WebKit): translucent frosted "glass" for the top bar, its buttons and the sheets. Never applied to the cards' text. */
@@ -837,6 +869,31 @@ function closeSheet(bg) {
     { id: 'wisteria', name: '藤', c: '#6a4fb3', v: { bg: '#f0edf8', bar: '#f8f6fd', card: '#ffffff', ink: '#271f3a', 'ink-soft': '#695e85', line: '#ddd6ef', accent: '#6a4fb3', 'accent-tint': '#e6e0f7', 'accent-ink': '#ffffff' }, d: { bg: '#14111d', bar: '#1b1726', card: '#211c2f', ink: '#ece6f8', 'ink-soft': '#a99fc4', line: '#342d49', accent: '#b5a0f2', 'accent-tint': '#352c55', 'accent-ink': '#14111d' } },
     { id: 'sumi', name: '墨', c: '#444444', v: { bg: '#eeeeec', bar: '#f6f6f4', card: '#ffffff', ink: '#1c1c1c', 'ink-soft': '#666666', line: '#dcdcd8', accent: '#2b2b2b', 'accent-tint': '#e4e4e0', 'accent-ink': '#ffffff' }, d: { bg: '#000000', bar: '#0b0b0b', card: '#141414', ink: '#ececec', 'ink-soft': '#9a9a9a', line: '#2a2a2a', accent: '#e8e8e8', 'accent-tint': '#2a2a2a', 'accent-ink': '#000000' } },
   ];
+  /* custom theme colour: derive light + dark palettes (surfaces, text, accent with enough contrast) from one picked colour */
+  function hsl2hex(h, s, l) { s /= 100; l /= 100; const k = function (n) { return (n + h / 30) % 12; }, a = s * Math.min(l, 1 - l), f = function (n) { const v = l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1))); return ('0' + Math.round(v * 255).toString(16)).slice(-2); }; return '#' + f(0) + f(8) + f(4); }
+  function hex2hsl(x) { const r = parseInt(x.substr(1, 2), 16) / 255, g = parseInt(x.substr(3, 2), 16) / 255, b = parseInt(x.substr(5, 2), 16) / 255, mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn, l = (mx + mn) / 2; let h = 0, sat = 0; if (d) { sat = d / (1 - Math.abs(2 * l - 1)); h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; h *= 60; if (h < 0) h += 360; } return [h, sat * 100, l * 100]; }
+  function lum(x) { return [1, 3, 5].map(function (i) { const c = parseInt(x.substr(i, 2), 16) / 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); }).reduce(function (a, c, i) { return a + c * [0.2126, 0.7152, 0.0722][i]; }, 0); }
+  function contrast(a, b) { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); }
+  function deriveTheme(hex) {
+    if (!/^#[0-9a-f]{6}$/i.test(hex || '')) hex = '#2c4a9a';
+    const q = hex2hsl(hex), h = q[0], s = Math.min(q[1], 85), gray = q[1] < 8, ts = gray ? 0 : 1;
+    let lL = Math.min(q[2], 60); while (lL > 8 && contrast(hsl2hex(h, s, lL), '#ffffff') < 4.5) lL -= 2;
+    const aL = hsl2hex(h, s, lL);
+    let dL = Math.max(q[2], 52); while (dL < 92 && contrast(hsl2hex(h, s, dL), '#172030') < 4.5) dL += 2;
+    const aD = hsl2hex(h, s, dL);
+    return { c: hex,
+      v: { bg: hsl2hex(h, 28 * ts, 94), bar: hsl2hex(h, 30 * ts, 97), card: '#ffffff', ink: hsl2hex(h, 30 * ts, 13), 'ink-soft': hsl2hex(h, 14 * ts, 40), line: hsl2hex(h, 24 * ts, 88), accent: aL, 'accent-tint': hsl2hex(h, 60 * ts, 92), 'accent-ink': '#ffffff' },
+      d: { bg: hsl2hex(h, 24 * ts, 7), bar: hsl2hex(h, 24 * ts, 10), card: hsl2hex(h, 24 * ts, 13), ink: hsl2hex(h, 25 * ts, 93), 'ink-soft': hsl2hex(h, 14 * ts, 68), line: hsl2hex(h, 20 * ts, 22), accent: aD, 'accent-tint': hsl2hex(h, 36 * ts, 22), 'accent-ink': hsl2hex(h, 24 * ts, 7) } };
+  }
+  /* pitch line colour must stay visible on the card in both modes: nudge lightness until contrast >= 3 */
+  function visiblePitch(hex) {
+    if (!/^#[0-9a-f]{6}$/i.test(hex || '')) return hex;
+    const card = getComputedStyle(root).getPropertyValue('--card').trim(), dk = root.getAttribute('data-theme') === 'dark';
+    if (!/^#[0-9a-f]{6}$/i.test(card)) return hex;
+    const q = hex2hsl(hex); let l = q[2], c = hex, n = 0;
+    while (contrast(c, card) < 3 && n++ < 40) { l += dk ? 2 : -2; c = hsl2hex(q[0], q[1], Math.max(0, Math.min(100, l))); }
+    return c;
+  }
   const ITEMS = [['speed', '语速 慢/正常'], ['tJp', '日文遮蔽'], ['tKanji', '汉字'], ['tZh', '中文遮蔽'], ['tPitch', '音调'], ['tRom', '罗马音'], ['tGj', '五十音'], ['tCols', '分栏按钮'], ['playAll', '连续播放']];
   const PCOL = ['#c0392b', '#e67e22', '#2e8b57', '#2c7be5', '#8e44ad', '#8a8a8a'];
   let lastCols = null, barCol = '#f7f8fb', dimmed = false;
@@ -850,26 +907,32 @@ function closeSheet(bg) {
   window.__dimBar = function (on) { dimmed = on; paintBar(); };
   function maxCols() { const w = window.innerWidth; return w >= 1300 ? 4 : w >= 1000 ? 3 : w >= 700 ? 2 : 1; }
   function effCols() { return Math.min(st.cols || 1, maxCols()); }
-  let st = { mode: 'auto', theme: 'auto', pitch: '', brush: false, hidden: {}, anim: 1, fs: 1, cols: 1, autohide: true, compact: false };
+  /* compact mode only helps while the top bar is narrow: the normal bar needs ~830px for one row (measured), so with
+     the bar's real available width (viewport, capped by the column layout's max width) >= 880px it is hidden and ignored */
+  const BAR_MAXW = { 1: 640, 2: 1080, 3: 1500, 4: 1900 }, ONE_ROW = 880;
+  function compactAllowed() { return Math.min(window.innerWidth, BAR_MAXW[effCols()] || 640) - 40 < ONE_ROW; }
+  let st = { mode: 'auto', theme: 'auto', pitch: '', brush: false, hidden: {}, anim: 1, fs: 1, cols: 1, autohide: true, compact: false, lock: false, lockShow: false, custom: '#2c4a9a' };
   try { const j = JSON.parse(localStorage.getItem('biaori-look') || 'null'); if (j) st = Object.assign(st, j); st.brush = false; if (!st.hidden) st.hidden = {}; if (!st.anim) st.anim = 1; if (!st.fs) st.fs = 1; if (!st.cols) st.cols = 1; if (!st.mode) st.mode = 'auto'; if (st.theme === 'night') { st.theme = 'auto'; st.mode = 'dark'; } if (st.theme === 'midnight') { st.theme = 'sumi'; st.mode = 'dark'; } if (st.anim >= 50) { st.noanim = true; st.anim = 1; } } catch (e) {}
   function save() { try { localStorage.setItem('biaori-look', JSON.stringify(st)); } catch (e) {} }
   const root = document.documentElement;
   const KEYS = ['bg', 'bar', 'card', 'ink', 'ink-soft', 'line', 'accent', 'accent-tint', 'accent-ink'];
   function apply() {
     KEYS.forEach(function (k) { root.style.removeProperty('--' + k); });
-    const t = THEMES.filter(function (x) { return x.id === st.theme; })[0] || THEMES[0];
+    const t = st.theme === 'custom' ? deriveTheme(st.custom) : (THEMES.filter(function (x) { return x.id === st.theme; })[0] || THEMES[0]);
     const dk = st.mode === 'dark' || (st.mode !== 'light' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
     const pal = dk ? t.d : t.v;
     KEYS.forEach(function (k) { root.style.setProperty('--' + k, pal[k]); });
     root.style.colorScheme = dk ? 'dark' : 'light';
     barCol = pal.bar; paintBar();
+    lockB.classList.toggle('on', !!st.lockShow); lockB.setAttribute('aria-pressed', String(!!st.lock)); lockB.setAttribute('aria-label', st.lock ? '解除锁定顶栏' : '锁定顶栏'); document.body.classList.toggle('lockshow', !!st.lockShow);
     root.setAttribute('data-theme', dk ? 'dark' : 'light');
-    if (st.pitch) root.style.setProperty('--pitch', st.pitch); else root.style.removeProperty('--pitch');
+    if (st.pitch) root.style.setProperty('--pitch', visiblePitch(st.pitch)); else root.style.removeProperty('--pitch');
     document.body.classList.toggle('brush', !!st.brush);
     const wasCompact = document.body.classList.contains('compact');
-    document.body.classList.toggle('compact', !!st.compact);
+    const cpOn = !!st.compact && compactAllowed();
+    document.body.classList.toggle('compact', cpOn);
     if (window.__paintSel) window.__paintSel();
-    if (wasCompact !== !!st.compact) requestAnimationFrame(function () { if (window.__moveInd) window.__moveInd(cur, false); window.dispatchEvent(new Event('resize')); });
+    if (wasCompact !== cpOn) requestAnimationFrame(function () { if (window.__moveInd) window.__moveInd(cur, false); window.dispatchEvent(new Event('resize')); });
     root.style.setProperty('--fs', String(st.fs || 1));
     const colsChanged = lastCols !== null && lastCols !== st.cols;
     let firstRects = null;
@@ -913,6 +976,13 @@ function closeSheet(bg) {
     ANIM_RATE = st.noanim ? 50 : (st.anim || 1); root.style.setProperty('--am', String(1 / ANIM_RATE));
     ITEMS.forEach(function (it) { document.body.classList.toggle('off-' + it[0], !!st.hidden[it[0]]); });
   }
+  const lockB = document.createElement('button'); lockB.type = 'button'; lockB.className = 'lockb'; lockB.id = 'lockB';
+  lockB.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2.5" fill="currentColor" fill-opacity=".15"/><path class="shk" d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>';
+  document.body.appendChild(lockB);
+  lockB.addEventListener('click', function () {
+    st.lock = !st.lock; save(); apply();
+    if (lockB.animate) lockB.animate([{ transform: 'scale(.82)' }, { transform: 'scale(1.1)', offset: .5 }, { transform: 'scale(1)' }], { duration: 420 * AM(), easing: 'ease-out' });
+  });
   const bg = document.createElement('div'); bg.className = 'gj-bg';
   bg.innerHTML = '<div class="gj" role="dialog" aria-label="设置"><header><b>设置</b><button type="button" class="chip" id="stX">完成</button></header><div class="body" id="stBody"></div></div>';
   document.body.appendChild(bg);
@@ -921,14 +991,14 @@ function closeSheet(bg) {
     let h = '<h3>明暗</h3><div class="seg gj-tabs">' + [['auto', '自动'], ['light', '浅色'], ['dark', '深色']].map(function (x) { return '<button type="button" data-mode="' + x[0] + '" aria-pressed="' + (st.mode === x[0]) + '">' + x[1] + '</button>'; }).join('') + '</div>';
     h += '<h3>主题色</h3><div class="st-row">' + THEMES.map(function (t) {
       return '<div class="sw-w"><button type="button" class="sw" data-th="' + t.id + '" aria-pressed="' + (st.theme === t.id) + '" aria-label="' + t.name + '"><span style="background:' + t.c + '"></span></button><div class="sw-l">' + t.name + '</div></div>';
-    }).join('') + '</div>';
+    }).join('') + '<div class="sw-w"><label class="sw-custom" id="swCu" data-on="' + (st.theme === 'custom' ? 1 : 0) + '" style="--cc:' + (st.custom || '#2c4a9a') + '" aria-label="自定义主题色"><i></i><input type="color" id="thIn" value="' + (st.custom || '#2c4a9a') + '"></label><div class="sw-l">自定义</div></div></div>';
     h += '<h3>音调线颜色</h3><div class="st-row"><button type="button" class="chip" data-pc="" aria-pressed="' + (!st.pitch) + '">跟随主题</button>' +
       PCOL.map(function (c) { return '<button type="button" class="sw" data-pc="' + c + '" aria-pressed="' + (st.pitch === c) + '" aria-label="' + c + '"><span style="background:' + c + '"></span></button>'; }).join('') +
-      '</div>';
+      '<label class="sw-custom" id="pcCu" data-on="' + (st.pitch && PCOL.indexOf(st.pitch) < 0 ? 1 : 0) + '" style="--cc:' + (st.pitch || '#c0392b') + '" aria-label="自定义音调线颜色"><i></i><input type="color" id="pcIn" value="' + (/^#[0-9a-f]{6}$/i.test(st.pitch || '') ? st.pitch : '#c0392b') + '"></label></div>';
     h += '<h3 class="cols-h">分栏（宽屏）</h3><div class="seg gj-tabs cols-seg">' + [1, 2, 3, 4].map(function (n) { return '<button type="button" data-cols="' + n + '" aria-pressed="' + (effCols() === n) + '">' + n + ' 列</button>'; }).join('') + '</div>';
     h += '<h3>字体大小 <b class="rv" id="fsV">' + Math.round((st.fs || 1) * 100) + '%</b></h3><input type="range" class="rg" id="fsR" min="0.8" max="1.5" step="0.02" value="' + (st.fs || 1) + '" aria-label="字体大小">';
     h += '<h3>点读声音</h3><div class="seg gj-tabs">' + [['k', 'Keita(男)'], ['g', 'Google(女)']].map(function (x) { return '<button type="button" data-voice="' + x[0] + '" aria-pressed="' + (window.__voice === x[0]) + '">' + x[1] + '</button>'; }).join('') + '</div>';
-    h += '<h3>顶栏</h3><div class="tg-list"><label class="tg" data-ah="1"><span>上滑时自动隐藏</span><input type="checkbox" class="sw-in" switch ' + (st.autohide !== false ? 'checked' : '') + '></label><label class="tg" data-cp="1"><span>紧凑模式（顶栏一行、小按钮）</span><input type="checkbox" class="sw-in" switch ' + (!!st.compact ? 'checked' : '') + '></label></div>';
+    h += '<h3>顶栏</h3><div class="tg-list"><label class="tg" data-ah="1"><span>上滑时自动隐藏</span><input type="checkbox" class="sw-in" switch ' + (st.autohide !== false ? 'checked' : '') + '></label>' + (compactAllowed() ? '<label class="tg" data-cp="1"><span>紧凑模式（顶栏一行、小按钮）</span><input type="checkbox" class="sw-in" switch ' + (!!st.compact ? 'checked' : '') + '></label>' : '') + '<label class="tg" data-lk="1"><span>显示「锁定」按钮（固定顶栏当前状态）</span><input type="checkbox" class="sw-in" switch ' + (!!st.lockShow ? 'checked' : '') + '></label></div>';
     h += '<h3>动画速度 <b class="rv" id="anV">' + (st.noanim ? '关闭' : '×' + (st.anim || 1).toFixed(1)) + '</b></h3><input type="range" class="rg" id="anR" min="0.4" max="2.4" step="0.1" value="' + (st.anim || 1) + '" ' + (st.noanim ? 'disabled' : '') + ' aria-label="动画速度"><div class="tg-list" style="margin-top:10px"><label class="tg" data-noanim="1"><span>关闭动画</span><input type="checkbox" class="sw-in" switch ' + (!!st.noanim ? 'checked' : '') + '></label></div>';
     h += '<h3>显示的按钮</h3><div class="tg-list">' + ITEMS.map(function (it) {
       return '<label class="tg" data-tg="' + it[0] + '"><span>' + it[1] + '</span><input type="checkbox" class="sw-in" switch ' + (!st.hidden[it[0]] ? 'checked' : '') + '></label>';
@@ -952,6 +1022,7 @@ function closeSheet(bg) {
     if (t.dataset.cols) { st.cols = Number(t.dataset.cols); }
     else if (t.dataset.noanim) { st.noanim = !st.noanim; }
     else if (t.dataset.cp) { st.compact = !st.compact; }
+    else if (t.dataset.lk) { st.lockShow = !st.lockShow; if (!st.lockShow) st.lock = false; }
     else if (t.dataset.ah) { st.autohide = st.autohide === false; if (!st.autohide) window.__showBar(); }
     else if (t.dataset.tg) {
       const id = t.dataset.tg, hide = !st.hidden[id];
@@ -971,7 +1042,7 @@ function closeSheet(bg) {
     else if (t.dataset.th) st.theme = t.dataset.th;
     else if (t.dataset.pc !== undefined) st.pitch = t.dataset.pc;
     else if (t.id === 'brushB') st.brush = !st.brush;
-    else if (t.id === 'stReset') st = { mode: 'auto', theme: 'auto', pitch: '', brush: false, hidden: {}, anim: 1, fs: 1, cols: 1, autohide: true, compact: false };
+    else if (t.id === 'stReset') st = { mode: 'auto', theme: 'auto', pitch: '', brush: false, hidden: {}, anim: 1, fs: 1, cols: 1, autohide: true, compact: false, lock: false, lockShow: false, custom: '#2c4a9a' };
     else return;
     save(); apply(); if (!keep) draw();
   }
@@ -983,10 +1054,17 @@ function closeSheet(bg) {
   bg.addEventListener('change', function (e) {
     if (e.target.id === 'fsR' || e.target.id === 'anR') { save(); apply(); }
   });
+  bg.addEventListener('input', function (e) {
+    if (e.target.id !== 'thIn') return;
+    st.custom = e.target.value; st.theme = 'custom'; apply();
+    const w = bg.querySelector('#swCu'); if (w) { w.style.setProperty('--cc', st.custom); w.dataset.on = '1'; }
+    Array.prototype.forEach.call(bg.querySelectorAll('.sw[data-th]'), function (x) { x.setAttribute('aria-pressed', 'false'); });
+  });
+  bg.addEventListener('change', function (e) { if (e.target.id === 'thIn') { st.custom = e.target.value; st.theme = 'custom'; save(); apply(); } });
   let raf = 0, pend = '';
   bg.addEventListener('input', function (e) {
     if (e.target.id !== 'pcIn') return;
-    pend = e.target.value; bg.classList.add('lite');
+    pend = visiblePitch(e.target.value); bg.classList.add('lite'); const w = bg.querySelector('#pcCu'); if (w) { w.style.setProperty('--cc', e.target.value); w.dataset.on = '1'; }
     if (!raf) raf = requestAnimationFrame(function () { raf = 0; root.style.setProperty('--pitch', pend); });
   });
   bg.addEventListener('change', function (e) {
@@ -996,6 +1074,7 @@ function closeSheet(bg) {
   document.getElementById('tSet').addEventListener('click', function () { draw(); openFrom(bg, this); });
   try { window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function () { if (st.mode === 'auto') apply(); }); } catch (e) {}
   let rz = 0; window.addEventListener('resize', function () { clearTimeout(rz); rz = setTimeout(function () { const cb = document.getElementById('tCols'); if (cb) Array.prototype.forEach.call(cb.querySelectorAll('button'), function (x) { x.setAttribute('aria-pressed', String(Number(x.dataset.c) === effCols())); }); }, 120); });
+  let rz2 = 0; window.addEventListener('resize', function () { clearTimeout(rz2); rz2 = setTimeout(function () { apply(); const sh = document.getElementById('stBody'); if (sh && sh.closest('.gj-bg.on')) draw(); }, 180); });
   window.__setCols = function (n) { if (n === st.cols) return; st.cols = n; save(); apply(); };
   /* auto-hide the top bar: one compositor-driven slide (CSS transition on transform) toggled by scroll direction.
      The scroll handler only compares numbers; no layout reads, no per-frame style writes.
@@ -1038,8 +1117,11 @@ function closeSheet(bg) {
     window.__showBar = function () { acc = 0; setHid(false, 400); };
     function check(now) {
       ticking = false;
-      const y = window.scrollY;
+      const max = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+      const y = Math.min(window.scrollY, max);         /* clamp: bottom rubber-band reads as no movement */
       if (y < 0) return;                               /* iOS rubber-band bounce */
+      if (st.lock) { lastY = y; lastT = now; acc = 0; return; }   /* locked: the bar stays as it is */
+      if (now < quiet || (!touching && now - lastTouch > 2500)) { lastY = y; lastT = now; acc = 0; if (y < h) setHid(false, 400); return; }  /* scroll not caused by the finger (reflow, button taps) */
       const dy = y - lastY, dt = Math.max(1, now - lastT); lastY = y; lastT = now;
       v = v * 0.5 + Math.abs(dy) / dt * 1000 * 0.5;    /* px/s, lightly smoothed */
       if (st.autohide === false || chain || y < h) { acc = 0; setHid(false, 400); return; }
@@ -1048,6 +1130,17 @@ function closeSheet(bg) {
       const ms = Math.max(200, Math.min(700, 760 - v * 0.28));
       if (acc > 24) setHid(true, ms); else if (acc < -16) setHid(false, ms);
     }
+    let touching = false, lastTouch = -1e9, quiet = 0;
+    const tn = function () { return performance.now(); };
+    window.addEventListener('touchstart', function () { touching = true; quiet = 0; lastTouch = tn(); }, { passive: true, capture: true });
+    window.addEventListener('touchmove', function () { lastTouch = tn(); }, { passive: true, capture: true });
+    window.addEventListener('touchend', function () { touching = false; lastTouch = tn(); }, { passive: true, capture: true });
+    window.addEventListener('touchcancel', function () { touching = false; lastTouch = tn(); }, { passive: true, capture: true });
+    window.addEventListener('wheel', function () { quiet = 0; lastTouch = tn(); }, { passive: true, capture: true });
+    window.addEventListener('keydown', function () { lastTouch = tn(); }, { capture: true });
+    /* taps/clicks reflow the page; ignore the scroll shifts that follow */
+    window.addEventListener('click', function () { quiet = tn() + 1000; lastTouch = -1e9; }, { capture: true });
+    window.addEventListener('change', function () { quiet = tn() + 1000; lastTouch = -1e9; }, { capture: true });
     window.addEventListener('scroll', function () { if (!ticking) { ticking = true; requestAnimationFrame(check); } }, { passive: true });
   })();
   apply();
