@@ -1137,6 +1137,16 @@ function closeSheet(bg) {
     }
     lockB.addEventListener('pointerup', end); lockB.addEventListener('pointercancel', end);
     lockB.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+    /* the click iOS synthesises when the finger lifts lands on whatever is under it (a word card): swallow every tap-like event for a moment after a drag, and while dragging */
+    let until = 0;
+    lockB.addEventListener('pointerup', function () { if (drag) until = Date.now() + 700; }, true);
+    ['click', 'mouseup', 'mousedown', 'touchend', 'touchstart', 'pointerup', 'pointerdown'].forEach(function (t) {
+      document.addEventListener(t, function (e) {
+        if (!(drag || Date.now() < until) || e.target === lockB || lockB.contains(e.target)) return;
+        e.stopImmediatePropagation(); if (e.cancelable) e.preventDefault();
+      }, true);
+    });
+    document.addEventListener('touchmove', function (e) { if (drag && e.cancelable) e.preventDefault(); }, { passive: false, capture: true });
   })();
   lockB.addEventListener('click', function (ev) {
     if (dragged) { ev.preventDefault(); return; }
