@@ -256,6 +256,9 @@ body.cols-4 { --cols: 4; --maxw: 1900px; }
 @media (max-width: 1299px) { #tCols button[data-c="4"], .gj button[data-cols="4"] { display: none; } }
 @media (max-width: 999px) { #tCols button[data-c="3"], .gj button[data-cols="3"] { display: none; } }
 @media (max-width: 699px) { .gj button[data-cols], .gj h3.cols-h, .gj .cols-seg { display: none; } }
+
+/* top bar slides away while scrolling down, comes back on the way up */
+header.bar.bar-hid { transform: translateY(calc(-100% - 2px)); box-shadow: none; }
 </style>
 
 <div class="wrap">
@@ -733,7 +736,7 @@ function closeSheet(bg) {
   let lastCols = null;
   function maxCols() { const w = window.innerWidth; return w >= 1300 ? 4 : w >= 1000 ? 3 : w >= 700 ? 2 : 1; }
   function effCols() { return Math.min(st.cols || 1, maxCols()); }
-  let st = { mode: 'auto', theme: 'auto', pitch: '', brush: false, hidden: {}, anim: 1, fs: 1, cols: 1 };
+  let st = { mode: 'auto', theme: 'auto', pitch: '', brush: false, hidden: {}, anim: 1, fs: 1, cols: 1, autohide: true };
   try { const j = JSON.parse(localStorage.getItem('biaori-look') || 'null'); if (j) st = Object.assign(st, j); st.brush = false; if (!st.hidden) st.hidden = {}; if (!st.anim) st.anim = 1; if (!st.fs) st.fs = 1; if (!st.cols) st.cols = 1; if (!st.mode) st.mode = 'auto'; if (st.theme === 'night') { st.theme = 'auto'; st.mode = 'dark'; } if (st.theme === 'midnight') { st.theme = 'sumi'; st.mode = 'dark'; } if (st.anim >= 50) { st.noanim = true; st.anim = 1; } } catch (e) {}
   function save() { try { localStorage.setItem('biaori-look', JSON.stringify(st)); } catch (e) {} }
   const root = document.documentElement;
@@ -787,6 +790,7 @@ function closeSheet(bg) {
       '</div>';
     h += '<h3 class="cols-h">分栏（宽屏）</h3><div class="seg gj-tabs cols-seg">' + [1, 2, 3, 4].map(function (n) { return '<button type="button" data-cols="' + n + '" aria-pressed="' + (effCols() === n) + '">' + n + ' 列</button>'; }).join('') + '</div>';
     h += '<h3>字体大小 <b class="rv" id="fsV">' + Math.round((st.fs || 1) * 100) + '%</b></h3><input type="range" class="rg" id="fsR" min="0.8" max="1.5" step="0.02" value="' + (st.fs || 1) + '" aria-label="字体大小">';
+    h += '<h3>顶栏</h3><div class="tg-list"><button type="button" class="tg" data-ah="1" role="switch" aria-checked="' + (st.autohide !== false) + '"><span>上滑时自动隐藏</span><i></i></button></div>';
     h += '<h3>动画速度 <b class="rv" id="anV">' + (st.noanim ? '关闭' : '×' + (st.anim || 1).toFixed(1)) + '</b></h3><input type="range" class="rg" id="anR" min="0.4" max="2.4" step="0.1" value="' + (st.anim || 1) + '" ' + (st.noanim ? 'disabled' : '') + ' aria-label="动画速度"><div class="tg-list" style="margin-top:10px"><button type="button" class="tg" data-noanim="1" role="switch" aria-checked="' + (!!st.noanim) + '"><span>关闭动画</span><i></i></button></div>';
     h += '<h3>显示的按钮</h3><div class="tg-list">' + ITEMS.map(function (it) {
       return '<button type="button" class="tg" data-tg="' + it[0] + '" role="switch" aria-checked="' + (!st.hidden[it[0]]) + '"><span>' + it[1] + '</span><i></i></button>';
@@ -801,6 +805,7 @@ function closeSheet(bg) {
     if (!t) return;
     if (t.dataset.cols) { st.cols = Number(t.dataset.cols); }
     else if (t.dataset.noanim) { st.noanim = !st.noanim; }
+    else if (t.dataset.ah) { st.autohide = st.autohide === false; if (!st.autohide) window.__showBar(); }
     else if (t.dataset.tg) {
       const id = t.dataset.tg, hide = !st.hidden[id];
       st.hidden[id] = hide;
@@ -818,7 +823,7 @@ function closeSheet(bg) {
     else if (t.dataset.th) st.theme = t.dataset.th;
     else if (t.dataset.pc !== undefined) st.pitch = t.dataset.pc;
     else if (t.id === 'brushB') st.brush = !st.brush;
-    else if (t.id === 'stReset') st = { mode: 'auto', theme: 'auto', pitch: '', brush: false, hidden: {}, anim: 1, fs: 1, cols: 1 };
+    else if (t.id === 'stReset') st = { mode: 'auto', theme: 'auto', pitch: '', brush: false, hidden: {}, anim: 1, fs: 1, cols: 1, autohide: true };
     else return;
     save(); apply(); draw();
   });
@@ -844,6 +849,23 @@ function closeSheet(bg) {
   try { window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function () { if (st.mode === 'auto') apply(); }); } catch (e) {}
   let rz = 0; window.addEventListener('resize', function () { clearTimeout(rz); rz = setTimeout(function () { const cb = document.getElementById('tCols'); if (cb) Array.prototype.forEach.call(cb.querySelectorAll('button'), function (x) { x.setAttribute('aria-pressed', String(Number(x.dataset.c) === effCols())); }); }, 120); });
   window.__setCols = function (n) { if (n === st.cols) return; st.cols = n; save(); apply(); };
+  /* auto-hide the top bar: hide after scrolling down a little, show again on any clear upward scroll or near the top */
+  (function () {
+    const bar = document.querySelector('header.bar');
+    let lastY = window.scrollY, acc = 0, ticking = false;
+    function setHid(h) { bar.classList.toggle('bar-hid', h); }
+    window.__showBar = function () { acc = 0; setHid(false); };
+    function check() {
+      ticking = false;
+      const y = window.scrollY, max = document.documentElement.scrollHeight - window.innerHeight;
+      if (y < 0 || y > max) return;                    /* iOS rubber-band bounce */
+      const dy = y - lastY; lastY = y;
+      if (st.autohide === false || chain || y < bar.offsetHeight) { acc = 0; setHid(false); return; }
+      acc = (dy > 0) === (acc > 0) ? acc + dy : dy;
+      if (acc > 12) setHid(true); else if (acc < -12) setHid(false);
+    }
+    window.addEventListener('scroll', function () { if (!ticking) { ticking = true; requestAnimationFrame(check); } }, { passive: true });
+  })();
   apply();
 })();
 document.getElementById('tCols').addEventListener('click', function (e) { const b = e.target.closest('button'); if (b) window.__setCols(Number(b.dataset.c)); });
