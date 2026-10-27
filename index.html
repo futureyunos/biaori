@@ -336,6 +336,8 @@ body.compact header.bar .seg[aria-label="语速"] button { min-width: var(--cw);
 header.bar { will-change: transform; transition: transform var(--bd, .6s) cubic-bezier(.45,.05,.25,1), background-color calc(.35s * var(--am, 1)) ease, border-color calc(.35s * var(--am, 1)) ease; }
 .lockb { position: fixed; right: max(14px, env(safe-area-inset-right, 0px)); bottom: calc(env(safe-area-inset-bottom, 0px) + 16px); z-index: 6; width: 44px; height: 44px; padding: 0; border-radius: 50%; border: 1px solid var(--line); background: var(--bar); color: var(--ink-soft); display: grid; place-items: center; cursor: pointer; opacity: 0; visibility: hidden; pointer-events: none; transform: translate3d(0, 14px, 0) scale(.55); will-change: transform, opacity; contain: layout style; box-shadow: 0 2px 10px rgba(0,0,0,.14);
   transition: opacity calc(.3s * var(--am, 1)), transform calc(.45s * var(--am, 1)) cubic-bezier(.2,1.25,.3,1), visibility 0s calc(.45s * var(--am, 1)), background calc(.3s * var(--am, 1)), color calc(.3s * var(--am, 1)), border-color calc(.3s * var(--am, 1)); }
+.lockb.drag { box-shadow: 0 8px 26px rgba(0,0,0,.34); opacity: 1; cursor: grabbing; }
+.lockb { touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 .lockb.on { opacity: .94; visibility: visible; pointer-events: auto; transform: translate3d(0, 0, 0); transition-delay: 0s; }
 header.bar.nt { transition: transform var(--bd, .6s) cubic-bezier(.45,.05,.25,1) !important; }
 header.bar.morph { background: transparent !important; border-bottom-color: transparent !important; box-shadow: none !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
@@ -1098,7 +1100,46 @@ function closeSheet(bg) {
   const lockB = document.createElement('button'); lockB.type = 'button'; lockB.className = 'lockb'; lockB.id = 'lockB';
   lockB.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2.5" fill="currentColor" fill-opacity=".15"/><path class="shk" d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>';
   document.body.appendChild(lockB);
-  lockB.addEventListener('click', function () {
+  /* long-press the lock button (about 0.4 s) to drag it; the spot is remembered, a plain tap still locks */
+  let lpos = null, dragged = false;
+  try { lpos = JSON.parse(localStorage.getItem('biaori-lockpos') || 'null'); } catch (e) {}
+  function placeLock() {
+    if (!lpos) return;
+    const w = lockB.offsetWidth || 44, h = lockB.offsetHeight || 44, m = 6;
+    const x = Math.min(Math.max(lpos.x * innerWidth - w / 2, m), innerWidth - w - m), y = Math.min(Math.max(lpos.y * innerHeight - h / 2, m), innerHeight - h - m);
+    lockB.style.left = x + 'px'; lockB.style.top = y + 'px'; lockB.style.right = 'auto'; lockB.style.bottom = 'auto';
+  }
+  placeLock(); window.addEventListener('resize', placeLock);
+  (function () {
+    let tm = 0, pid = null, sx = 0, sy = 0, ox = 0, oy = 0, drag = false;
+    lockB.addEventListener('pointerdown', function (e) {
+      if (e.button) return;
+      pid = e.pointerId; sx = e.clientX; sy = e.clientY; drag = false;
+      clearTimeout(tm);
+      tm = setTimeout(function () {
+        const r = lockB.getBoundingClientRect(); ox = sx - r.left; oy = sy - r.top; drag = true; dragged = true;
+        try { lockB.setPointerCapture(pid); } catch (x) {}
+        lockB.classList.add('drag'); if (navigator.vibrate) { try { navigator.vibrate(12); } catch (x) {} }
+      }, 400);
+    });
+    lockB.addEventListener('pointermove', function (e) {
+      if (e.pointerId !== pid) return;
+      if (!drag) { if (Math.abs(e.clientX - sx) + Math.abs(e.clientY - sy) > 10) clearTimeout(tm); return; }
+      const w = lockB.offsetWidth, h = lockB.offsetHeight, m = 6;
+      const x = Math.min(Math.max(e.clientX - ox, m), innerWidth - w - m), y = Math.min(Math.max(e.clientY - oy, m), innerHeight - h - m);
+      lockB.style.left = x + 'px'; lockB.style.top = y + 'px'; lockB.style.right = 'auto'; lockB.style.bottom = 'auto';
+      lpos = { x: (x + w / 2) / innerWidth, y: (y + h / 2) / innerHeight };
+    });
+    function end(e) {
+      if (e.pointerId !== pid) return;
+      clearTimeout(tm); pid = null;
+      if (drag) { drag = false; lockB.classList.remove('drag'); try { localStorage.setItem('biaori-lockpos', JSON.stringify(lpos)); } catch (x) {} setTimeout(function () { dragged = false; }, 350); }
+    }
+    lockB.addEventListener('pointerup', end); lockB.addEventListener('pointercancel', end);
+    lockB.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+  })();
+  lockB.addEventListener('click', function (ev) {
+    if (dragged) { ev.preventDefault(); return; }
     st.lock = !st.lock; save(); apply();
     if (lockB.animate) lockB.animate([{ transform: 'scale(.82)' }, { transform: 'scale(1.1)', offset: .5 }, { transform: 'scale(1)' }], { duration: 420 * AM(), easing: 'ease-out' });
   });
