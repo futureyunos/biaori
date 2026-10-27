@@ -213,7 +213,7 @@ body, header.bar, .lessons button, .seg, .seg button, .chip, .gear, .row, .gj, .
 .spk { transition: transform calc(.3s * var(--am, 1)) var(--spring); }
 .row:active .spk { transform: scale(.88); }
 .row.playing .spk { transform: scale(1.1); }
-@supports (overflow: clip) { #app { overflow: clip; } html, body { overflow-x: clip; } }   /* cards flying in from the old column positions must not create a horizontal scrollbar: it shrinks the viewport and makes the fixed lock button jump */
+@supports (overflow: clip) { html, body { overflow-x: clip; } }   /* cards sliding in from the old column positions must not create a horizontal scrollbar (it shrinks the viewport and makes the fixed lock button jump); clipped at the page edge, never at the (new, narrower) container */
 #app li, main li { animation: rise calc(.95s * var(--am, 1)) cubic-bezier(.16,1,.3,1) both; animation-delay: calc(min(var(--i, 0), 12) * calc(55ms * var(--am, 1)) + calc(60ms * var(--am, 1))); }
 @keyframes rise { 0% { opacity: 0; transform: translateY(34px) scale(.96); } 45% { opacity: 1; } 100% { opacity: 1; transform: none; } }
 #app h2 { animation: rise calc(.8s * var(--am, 1)) cubic-bezier(.16,1,.3,1) both; }
@@ -335,7 +335,9 @@ header.bar { will-change: transform; transition: transform var(--bd, .6s) cubic-
 .lockb { position: fixed; right: max(14px, env(safe-area-inset-right, 0px)); bottom: calc(env(safe-area-inset-bottom, 0px) + 16px); z-index: 6; width: 44px; height: 44px; padding: 0; border-radius: 50%; border: 1px solid var(--line); background: var(--bar); color: var(--ink-soft); display: grid; place-items: center; cursor: pointer; opacity: 0; visibility: hidden; pointer-events: none; transform: translate3d(0, 14px, 0) scale(.55); will-change: transform, opacity; contain: layout style; box-shadow: 0 2px 10px rgba(0,0,0,.14);
   transition: opacity calc(.3s * var(--am, 1)), transform calc(.45s * var(--am, 1)) cubic-bezier(.2,1.25,.3,1), visibility 0s calc(.45s * var(--am, 1)), background calc(.3s * var(--am, 1)), color calc(.3s * var(--am, 1)), border-color calc(.3s * var(--am, 1)); }
 .lockb.on { opacity: .94; visibility: visible; pointer-events: auto; transform: translate3d(0, 0, 0); transition-delay: 0s; }
-body.colsbusy .lockb { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+header.bar.nt { transition: transform var(--bd, .6s) cubic-bezier(.45,.05,.25,1) !important; }
+header.bar.morph { background: transparent !important; border-bottom-color: transparent !important; box-shadow: none !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+.bar-ghost { position: absolute; left: 0; top: 0; z-index: -1; pointer-events: none; box-sizing: border-box; background: var(--bar); border-bottom: 1px solid var(--line); border-radius: 0 0 var(--r-card) var(--r-card); }
 .lockb[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 .lockb svg { width: 22px; height: 22px; overflow: visible; }
 .lockb .shk { transform-box: fill-box; transform-origin: 100% 100%; transition: transform calc(.4s * var(--am, 1)) cubic-bezier(.3,1.4,.4,1); transform: translate(0, -3px) rotate(-28deg); }
@@ -990,12 +992,12 @@ function closeSheet(bg) {
     const colsChanged = lastCols !== null && lastCols !== st.cols;
     if (colsChanged) { document.body.classList.add('colsbusy'); clearTimeout(window.__cbT); window.__cbT = setTimeout(function () { document.body.classList.remove('colsbusy'); }, 1200 * AM()); }
     let firstRects = null;
-    if (colsChanged) firstRects = Array.prototype.map.call(document.querySelectorAll('main li'), function (li) { const r = li.getBoundingClientRect(); return { li: li, x: r.left, y: r.top }; });
+    if (colsChanged) firstRects = Array.prototype.map.call(document.querySelectorAll('main li, main h2'), function (li) { const r = li.getBoundingClientRect(); return { li: li, x: r.left, y: r.top, w: r.width }; });
     /* the top bar follows along: its buttons glide to their new spots and its height eases */
     let hdr = null;
     if (colsChanged) {
       const hd = document.querySelector('header.bar');
-      hdr = { hd: hd, h0: hd.offsetHeight, items: Array.prototype.map.call(hd.querySelectorAll('.controls > *, .title > *'), function (el) { const r = el.getBoundingClientRect(); return { el: el, x: r.left, y: r.top }; }) };
+      hdr = { hd: hd, h0: hd.offsetHeight, w0: hd.getBoundingClientRect().width, l0: hd.getBoundingClientRect().left, iw0: hd.querySelector('.bar-inner').getBoundingClientRect().width, items: Array.prototype.map.call(hd.querySelectorAll('.controls > *, .title > *'), function (el) { const r = el.getBoundingClientRect(); return { el: el, x: r.left, y: r.top }; }) };
     }
     [1, 2, 3, 4].forEach(function (n) { document.body.classList.toggle('cols-' + n, st.cols === n); });
     /* keep the card the reader was looking at in the same place on screen: the page height changes a lot with the column count,
@@ -1006,16 +1008,21 @@ function closeSheet(bg) {
       if (a) { const d = a.li.getBoundingClientRect().top - a.y; if (Math.abs(d) > 1) window.scrollBy(0, d); }
     }
     if (hdr && hdr.hd.animate) {
-      const dur = 650 * AM(), ease = 'cubic-bezier(.22,.9,.3,1)', h1 = hdr.hd.offsetHeight;
-      hdr.items.forEach(function (o, i) {
-        const r = o.el.getBoundingClientRect(), dx = o.x - r.left, dy = o.y - r.top;
-        if (dx || dy) o.el.animate([{ transform: 'translate(' + dx + 'px,' + dy + 'px)' }, { transform: 'none' }], { duration: dur, delay: Math.min(i, 8) * 15 * AM(), easing: ease, fill: 'backwards' });
-      });
-      if (h1 !== hdr.h0) {
-        hdr.hd.style.overflow = 'hidden';
-        const a = hdr.hd.animate([{ height: hdr.h0 + 'px' }, { height: h1 + 'px' }], { duration: dur, easing: ease });
-        a.onfinish = a.oncancel = function () { hdr.hd.style.overflow = ''; };
+      /* the bar: its buttons glide (transform only); its frame is a ghost layer that scales from the old size to the new one, so nothing is re-laid-out frame by frame */
+      const dur = 780 * AM(), ease = 'cubic-bezier(.33,.7,.2,1)', hd = hdr.hd, r1 = hd.getBoundingClientRect(), h1 = hd.offsetHeight;
+      const moves = hdr.items.map(function (o) { const r = o.el.getBoundingClientRect(); return { o: o, dx: o.x - r.left, dy: o.y - r.top }; });
+      if (Math.abs(r1.width - hdr.w0) > 1 || h1 !== hdr.h0) {
+        const gh = document.createElement('div'); gh.className = 'bar-ghost'; gh.style.width = r1.width + 'px'; gh.style.height = h1 + 'px';
+        /* one rectangle only: the ghost takes over the bar's whole look (fill, glass blur, line, corners, shadow) and its real box (left/width/height, not a scale) moves from the old size to the new one, so corners and blur stay true; the bar itself draws nothing meanwhile */
+        const cs = getComputedStyle(hd);
+        ['backgroundColor', 'backgroundImage', 'borderBottom', 'borderRadius', 'boxShadow', 'backdropFilter', 'webkitBackdropFilter'].forEach(function (k) { if (cs[k] != null) gh.style[k] = cs[k]; });
+        hd.classList.add('nt', 'morph'); hd.insertBefore(gh, hd.firstChild);
+        const an = gh.animate([{ left: (hdr.l0 - r1.left) + 'px', width: hdr.w0 + 'px', height: hdr.h0 + 'px' }, { left: '0px', width: r1.width + 'px', height: h1 + 'px' }], { duration: dur, easing: ease });
+        an.onfinish = an.oncancel = function () { gh.remove(); hd.classList.remove('morph'); void hd.offsetWidth; requestAnimationFrame(function () { hd.classList.remove('nt'); }); };
       }
+      moves.forEach(function (m, i) {
+        if (m.dx || m.dy) m.o.el.animate([{ transform: 'translate(' + m.dx + 'px,' + m.dy + 'px)' }, { transform: 'none' }], { duration: dur, delay: Math.min(i, 8) * 15 * AM(), easing: ease, fill: 'backwards' });
+      });
     }
     const cb = document.getElementById('tCols');
     if (cb) {
@@ -1027,10 +1034,39 @@ function closeSheet(bg) {
     }
     if (firstRects) {
       const vh = window.innerHeight;
-      firstRects.forEach(function (o, i) {
-        const r = o.li.getBoundingClientRect(), dx = o.x - r.left, dy = o.y - r.top;
-        if (!o.li.animate || (r.bottom < -50 && o.y < -50) || (r.top > vh + 50 && o.y > vh + 50) || (!dx && !dy)) return;
-        o.li.animate([{ transform: 'translate(' + dx + 'px,' + dy + 'px)', opacity: .55 }, { transform: 'none', opacity: 1 }], { duration: 750 * AM(), delay: Math.min(i, 14) * 18 * AM(), easing: 'cubic-bezier(.2,.9,.25,1)', fill: 'backwards' });
+      /* read everything first (one layout), then write: only cards within a screen of the viewport are animated, the rest switch instantly */
+      const plan = [];
+      firstRects.forEach(function (o) {
+        const r = o.li.getBoundingClientRect(), dx = o.x - r.left, dy = o.y - r.top, dw = o.w - r.width;
+        if (!o.li.animate || (r.bottom < -vh && o.y < -vh) || (r.top > 2 * vh && o.y > 2 * vh) || (r.bottom < 0 && o.y + 0 < 0 && false) || (!dx && !dy && Math.abs(dw) < 1)) return;
+        if (r.bottom < -50 && o.y < -50) return;
+        if (r.top > vh + 50 && o.y > vh + 50) return;
+        plan.push({ o: o, r: r, dx: dx, dy: dy });
+      });
+      plan.forEach(function (q, i) {
+        const o = q.o, r = q.r, dx = q.dx, dy = q.dy;
+        const dur = 780 * AM(), delay = Math.min(i, 12) * 14 * AM(), ease = 'cubic-bezier(.33,.7,.2,1)';
+        if (o.li.tagName === 'H2') {      /* section heading: slides; its line opens up (cut to the old width) when the row gets wider */
+          const k0 = { transform: 'translate(' + dx + 'px,' + dy + 'px)' }, k1 = { transform: 'none' };
+          if (r.width - o.w > 2) { k0.clipPath = 'inset(0 ' + (r.width - o.w) + 'px 0 0)'; k1.clipPath = 'inset(0 0 0 0)'; }
+          o.li.animate([k0, k1], { duration: dur, delay: delay, easing: ease, fill: 'backwards' });
+          return;
+        }
+        /* card: the frame changes width continuously (scaleX from the old width), content is counter-scaled so text is never stretched; transform only */
+        const s0 = Math.max(.2, Math.min(5, o.w / r.width)), N = 8, kf = [], kc = [];
+        for (let k = 0; k <= N; k++) {
+          const t = k / N, sx = s0 + (1 - s0) * t;
+          kf.push({ offset: t, transform: 'translate(' + dx * (1 - t) + 'px,' + dy * (1 - t) + 'px) scaleX(' + sx + ')', opacity: .55 + .45 * t });
+          kc.push({ offset: t, transform: 'scaleX(' + (1 / sx) + ')' });
+        }
+        const opt = { duration: dur, delay: delay, easing: ease, fill: 'backwards' }, row = o.li.firstElementChild;
+        o.li.style.transformOrigin = '0 0';
+        o.li.animate(kf, opt).onfinish = function () { o.li.style.transformOrigin = ''; o.li.style.willChange = ''; };
+        if (row) {
+          row.style.overflow = 'hidden';
+          Array.prototype.forEach.call(row.children, function (c) { c.style.transformOrigin = '0 50%'; c.animate(kc, opt); });
+          setTimeout(function () { row.style.overflow = ''; Array.prototype.forEach.call(row.children, function (c) { c.style.transformOrigin = ''; c.style.willChange = ''; }); }, dur + delay + 80);
+        }
       });
     }
     lastCols = st.cols;
@@ -1202,10 +1238,11 @@ function closeSheet(bg) {
     window.__showBar = function () { acc = 0; setHid(false, 400); };
     function check(now) {
       ticking = false;
+      if (st.lock || document.body.classList.contains('colsbusy')) { lastY = window.scrollY; lastT = now; acc = 0; return; }   /* no layout reads while columns change / locked */
       const max = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
       const y = Math.min(window.scrollY, max);         /* clamp: bottom rubber-band reads as no movement */
       if (y < 0) return;                               /* iOS rubber-band bounce */
-      if (st.lock) { lastY = y; lastT = now; acc = 0; return; }   /* locked: the bar stays as it is */
+      if (st.lock || document.body.classList.contains('colsbusy')) { lastY = y; lastT = now; acc = 0; return; }   /* locked: the bar stays as it is */
       if (now < quiet || (!touching && now - lastTouch > 2500)) { lastY = y; lastT = now; acc = 0; if (y < h) setHid(false, 400); return; }  /* scroll not caused by the finger (reflow, button taps) */
       const dy = y - lastY, dt = Math.max(1, now - lastT); lastY = y; lastT = now;
       v = v * 0.5 + Math.abs(dy) / dt * 1000 * 0.5;    /* px/s, lightly smoothed */
@@ -1259,7 +1296,7 @@ document.getElementById('tZh').addEventListener('click', function () {
   // fetch the other lessons' audio in the background so switching lessons has no wait
   setTimeout(function () {
     let i = 1;
-    (function nx() { if (i > LESSONS.length) return; loadAudio(i++).then(function () { setTimeout(nx, 300); }); })();
+    (function nx() { if (i > LESSONS.length) return; if (document.body.classList.contains('colsbusy')) { setTimeout(nx, 500); return; } loadAudio(i++).then(function () { setTimeout(nx, 300); }); })();
   }, 1200);
 })();
 </script>
