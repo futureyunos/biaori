@@ -299,8 +299,10 @@ body.compact header.bar .chip::after, body.compact header.bar .seg button[id]::a
 body.compact #slow::after { content: '慢'; } body.compact #norm::after { content: '常'; }
 body.compact #tJp::after { content: '日'; } body.compact #tKanji::after { content: '汉'; } body.compact #tZh::after { content: '中'; }
 body.compact #tPitch::after { content: '调'; } body.compact #tRom::after { content: 'A'; } body.compact #tGj::after { content: 'あ'; }
-body.compact #playAll { margin-left: 0; }
-body.compact #playAll::after { content: '▶'; } body.compact #playAll.on::after { content: '❚❚'; font-size: calc(var(--cfs) - 2px); letter-spacing: -1px; }
+body.compact #playAll { margin-left: 0; display: inline-flex; align-items: center; justify-content: center; }
+/* play / pause drawn with CSS (not text glyphs) so they sit exactly in the middle of the round button */
+body.compact #playAll::after { content: ''; display: block; width: 0; height: 0; font-size: 0; border-style: solid; border-width: calc(var(--cfs) * .42) 0 calc(var(--cfs) * .42) calc(var(--cfs) * .7); border-color: transparent transparent transparent currentColor; margin-left: calc(var(--cfs) * .05); }
+body.compact #playAll.on::after { content: ''; display: block; width: calc(var(--cfs) * .72); height: calc(var(--cfs) * .84); border: 0; margin: 0; background: linear-gradient(to right, currentColor 0 36%, transparent 36% 64%, currentColor 64% 100%); }
 body.compact #tCols button { font-size: var(--cfs); padding: 0 var(--cpx); min-width: var(--cw); }
 body.compact .status { display: none; }
 body.compact .jp-float { top: calc(env(safe-area-inset-top, 0px) + 6px); }
