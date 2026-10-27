@@ -136,7 +136,7 @@ input[type=color] { width: 40px; height: 34px; border: 1px solid var(--line); bo
 .hide-pitch .acc { display: none; }
 .gj-bg { position: fixed; inset: 0; background: rgba(0,0,0,0); z-index: 50; visibility: hidden; pointer-events: none; transition: background calc(.4s * var(--am, 1)) ease, visibility 0s linear calc(.6s * var(--am, 1)); }
 .gj-bg.on { background: rgba(0,0,0,.32); visibility: visible; pointer-events: auto; transition: background calc(.4s * var(--am, 1)) ease, visibility 0s; }
-.gj { position: absolute; inset: 24px 12px; max-width: 560px; margin: 0 auto; background: var(--card); border: 1px solid rgba(255,255,255,.45); box-shadow: 0 24px 60px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.5); border-radius: 26px; display: flex; flex-direction: column; overflow: hidden;
+.gj { position: absolute; inset: 24px 12px; max-width: 560px; margin: 0 auto; background: var(--card); border: 0; box-shadow: 0 24px 60px rgba(0,0,0,.28); border-radius: 26px; display: flex; flex-direction: column; overflow: hidden;
   transform-origin: var(--ox, 50%) var(--oy, 0); transform: scale(.12); opacity: 0; border-radius: 60px;
   transition: transform calc(.5s * var(--am, 1)) cubic-bezier(.32,.72,0,1), opacity calc(.25s * var(--am, 1)) ease calc(.05s * var(--am, 1)), border-radius calc(.5s * var(--am, 1)) cubic-bezier(.32,.72,0,1); }
 .gj-bg.on .gj { transform: none; opacity: 1; border-radius: 26px; transition: transform calc(.55s * var(--am, 1)) cubic-bezier(.3,1.15,.4,1), opacity calc(.2s * var(--am, 1)) ease, border-radius calc(.55s * var(--am, 1)) cubic-bezier(.3,1.15,.4,1); }
@@ -258,7 +258,11 @@ body.cols-4 { --cols: 4; --maxw: 1900px; }
 @media (max-width: 699px) { .gj button[data-cols], .gj h3.cols-h, .gj .cols-seg { display: none; } }
 
 /* top bar slides away while scrolling down, comes back on the way up */
-header.bar.bar-hid { transform: translateY(calc(-100% - 2px)); box-shadow: none; }
+/* sheets: header and body share the card colour exactly, no fading layers */
+.gj, .gj header, .gj .body { background: var(--card); }
+.gj > *, .gj-bg.on .gj > *, .gj-bg .gj > * { opacity: 1 !important; transition: none !important; }
+header.bar { will-change: transform; transition: transform calc(.6s * var(--am, 1)) cubic-bezier(.45,.05,.25,1), background-color calc(.35s * var(--am, 1)) ease, border-color calc(.35s * var(--am, 1)) ease; }
+header.bar.bar-hid { transform: translate3d(0, calc(-100% - 2px), 0); }
 </style>
 
 <div class="wrap">
@@ -659,6 +663,7 @@ function openFrom(bg, btn) {
   if (!bg.isConnected) document.body.appendChild(bg);
   bg.classList.remove('closing');
   bg.classList.add('on');
+  if (window.__dimBar) window.__dimBar(true);
   if (!p.animate) return;
   if (bg._anim) bg._anim.cancel();
   bg._anim = p.animate([{ transform: sheetFrom(bg), borderRadius: '50%' }, { transform: 'none', borderRadius: '26px' }], { duration: 600 * AM(), easing: SHEET_EASE });
@@ -666,10 +671,11 @@ function openFrom(bg, btn) {
 function closeSheet(bg) {
   const p = bg.querySelector('.gj');
   bg.classList.remove('on');
+  if (window.__dimBar) window.__dimBar(false);
   if (!p.animate || !bg._btn) { bg.remove(); return; }
   bg.classList.add('closing');
   if (bg._anim) bg._anim.cancel();
-  const SH0 = '0 24px 60px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.5)', SH1 = '0 0 0 rgba(0,0,0,0), inset 0 0 0 rgba(255,255,255,0)';
+  const SH0 = '0 24px 60px rgba(0,0,0,.28)', SH1 = '0 0 0 rgba(0,0,0,0)';
   bg._anim = p.animate([
     { transform: 'none', borderRadius: '26px', opacity: 1, boxShadow: SH0, offset: 0 },
     { transform: sheetFrom(bg), borderRadius: '50%', opacity: .4, boxShadow: SH1, offset: .7 },
@@ -733,7 +739,15 @@ function closeSheet(bg) {
   ];
   const ITEMS = [['speed', '语速 慢/正常'], ['tJp', '日文遮蔽'], ['tKanji', '汉字'], ['tZh', '中文遮蔽'], ['tPitch', '音调'], ['tRom', '罗马音'], ['tGj', '五十音'], ['tCols', '分栏按钮'], ['playAll', '连续播放']];
   const PCOL = ['#c0392b', '#e67e22', '#2e8b57', '#2c7be5', '#8e44ad', '#8a8a8a'];
-  let lastCols = null;
+  let lastCols = null, barCol = '#f7f8fb', dimmed = false;
+  /* the iOS status bar / theme-color should match what the page looks like: the bar colour, darkened by the .32 overlay while a sheet is open */
+  function paintBar() {
+    const m = document.querySelector('meta[name="theme-color"]'); if (!m) return;
+    let c = barCol;
+    if (dimmed && /^#[0-9a-f]{6}$/i.test(c)) c = '#' + [1, 3, 5].map(function (i) { return ('0' + Math.round(parseInt(c.substr(i, 2), 16) * 0.68).toString(16)).slice(-2); }).join('');
+    m.setAttribute('content', c);
+  }
+  window.__dimBar = function (on) { dimmed = on; paintBar(); };
   function maxCols() { const w = window.innerWidth; return w >= 1300 ? 4 : w >= 1000 ? 3 : w >= 700 ? 2 : 1; }
   function effCols() { return Math.min(st.cols || 1, maxCols()); }
   let st = { mode: 'auto', theme: 'auto', pitch: '', brush: false, hidden: {}, anim: 1, fs: 1, cols: 1, autohide: true };
@@ -748,6 +762,7 @@ function closeSheet(bg) {
     const pal = dk ? t.d : t.v;
     KEYS.forEach(function (k) { root.style.setProperty('--' + k, pal[k]); });
     root.style.colorScheme = dk ? 'dark' : 'light';
+    barCol = pal.bar; paintBar();
     root.setAttribute('data-theme', dk ? 'dark' : 'light');
     if (st.pitch) root.style.setProperty('--pitch', st.pitch); else root.style.removeProperty('--pitch');
     document.body.classList.toggle('brush', !!st.brush);
@@ -849,20 +864,24 @@ function closeSheet(bg) {
   try { window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function () { if (st.mode === 'auto') apply(); }); } catch (e) {}
   let rz = 0; window.addEventListener('resize', function () { clearTimeout(rz); rz = setTimeout(function () { const cb = document.getElementById('tCols'); if (cb) Array.prototype.forEach.call(cb.querySelectorAll('button'), function (x) { x.setAttribute('aria-pressed', String(Number(x.dataset.c) === effCols())); }); }, 120); });
   window.__setCols = function (n) { if (n === st.cols) return; st.cols = n; save(); apply(); };
-  /* auto-hide the top bar: hide after scrolling down a little, show again on any clear upward scroll or near the top */
+  /* auto-hide the top bar: one compositor-driven slide (CSS transition on transform) toggled by scroll direction.
+     The scroll handler only compares numbers; no layout reads, no per-frame style writes. */
   (function () {
     const bar = document.querySelector('header.bar');
-    let lastY = window.scrollY, acc = 0, ticking = false;
-    function setHid(h) { bar.classList.toggle('bar-hid', h); }
+    let lastY = window.scrollY, acc = 0, hid = false, ticking = false, h = 0;
+    function measure() { h = bar.offsetHeight; }
+    measure(); window.addEventListener('resize', measure);
+    function setHid(v) { if (v === hid) return; hid = v; bar.classList.toggle('bar-hid', v); }
     window.__showBar = function () { acc = 0; setHid(false); };
     function check() {
       ticking = false;
-      const y = window.scrollY, max = document.documentElement.scrollHeight - window.innerHeight;
-      if (y < 0 || y > max) return;                    /* iOS rubber-band bounce */
+      const y = window.scrollY;
+      if (y < 0) return;                               /* iOS rubber-band bounce */
       const dy = y - lastY; lastY = y;
-      if (st.autohide === false || chain || y < bar.offsetHeight) { acc = 0; setHid(false); return; }
-      acc = (dy > 0) === (acc > 0) ? acc + dy : dy;
-      if (acc > 12) setHid(true); else if (acc < -12) setHid(false);
+      if (st.autohide === false || chain || y < h) { acc = 0; setHid(false); return; }
+      if (dy * acc < 0) acc = 0;
+      acc += dy;
+      if (acc > 24) setHid(true); else if (acc < -16) setHid(false);
     }
     window.addEventListener('scroll', function () { if (!ticking) { ticking = true; requestAnimationFrame(check); } }, { passive: true });
   })();
