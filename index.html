@@ -1110,6 +1110,14 @@ function closeSheet(bg) {
     lockB.style.left = x + 'px'; lockB.style.top = y + 'px'; lockB.style.right = 'auto'; lockB.style.bottom = 'auto';
   }
   placeLock(); window.addEventListener('resize', placeLock);
+  /* haptic tick when the drag starts: Android via vibrate(); iPhone (iOS 18+) has no vibrate(), but flipping a hidden native switch through its label gives the system haptic */
+  const hapL = document.createElement('label'); hapL.setAttribute('aria-hidden', 'true'); hapL.style.cssText = 'position:fixed;left:-99px;top:0;width:1px;height:1px;opacity:0;pointer-events:none;overflow:hidden';
+  const hapI = document.createElement('input'); hapI.type = 'checkbox'; hapI.setAttribute('switch', ''); hapI.tabIndex = -1; hapL.appendChild(hapI); document.body.appendChild(hapL);
+  function buzz() {
+    let ok = false;
+    try { if (navigator.vibrate) ok = navigator.vibrate(12); } catch (x) {}
+    if (!ok) { try { hapL.click(); } catch (x) {} }
+  }
   (function () {
     let tm = 0, pid = null, sx = 0, sy = 0, ox = 0, oy = 0, drag = false;
     lockB.addEventListener('pointerdown', function (e) {
@@ -1119,7 +1127,7 @@ function closeSheet(bg) {
       tm = setTimeout(function () {
         const r = lockB.getBoundingClientRect(); ox = sx - r.left; oy = sy - r.top; drag = true; dragged = true;
         try { lockB.setPointerCapture(pid); } catch (x) {}
-        lockB.classList.add('drag'); if (navigator.vibrate) { try { navigator.vibrate(12); } catch (x) {} }
+        lockB.classList.add('drag'); buzz();
       }, 400);
     });
     lockB.addEventListener('pointermove', function (e) {
@@ -1142,7 +1150,7 @@ function closeSheet(bg) {
     lockB.addEventListener('pointerup', function () { if (drag) until = Date.now() + 700; }, true);
     ['click', 'mouseup', 'mousedown', 'touchend', 'touchstart', 'pointerup', 'pointerdown'].forEach(function (t) {
       document.addEventListener(t, function (e) {
-        if (!(drag || Date.now() < until) || e.target === lockB || lockB.contains(e.target)) return;
+        if (!(drag || Date.now() < until) || e.target === lockB || lockB.contains(e.target) || hapL.contains(e.target)) return;
         e.stopImmediatePropagation(); if (e.cancelable) e.preventDefault();
       }, true);
     });
