@@ -967,7 +967,7 @@ function closeSheet(bg) {
      the bar's real available width (viewport, capped by the column layout's max width) >= 880px it is hidden and ignored */
   const BAR_MAXW = { 1: 640, 2: 1080, 3: 1500, 4: 1900 }, ONE_ROW = 880;
   function compactAllowed() { return Math.min(window.innerWidth, BAR_MAXW[effCols()] || 640) - 40 < ONE_ROW; }
-  let st = { mode: 'auto', theme: 'auto', pitch: '', brush: false, hidden: {}, anim: 1, fs: 1, cols: 1, autohide: true, compact: false, lock: false, lockShow: false, custom: '#2c4a9a' };
+  let st = { mode: 'auto', theme: 'auto', pitch: '', brush: false, hidden: {}, anim: 1, fs: 1, cols: 1, compact: false, lock: false, lockShow: false, custom: '#2c4a9a' };
   try { const j = JSON.parse(localStorage.getItem('biaori-look') || 'null'); if (j) st = Object.assign(st, j); st.brush = false; if (!st.hidden) st.hidden = {}; if (!st.anim) st.anim = 1; if (!st.fs) st.fs = 1; if (!st.cols) st.cols = 1; if (!st.mode) st.mode = 'auto'; if (st.theme === 'night') { st.theme = 'auto'; st.mode = 'dark'; } if (st.theme === 'midnight') { st.theme = 'sumi'; st.mode = 'dark'; } if (st.anim >= 50) { st.noanim = true; st.anim = 1; } } catch (e) {}
   function save() { try { localStorage.setItem('biaori-look', JSON.stringify(st)); } catch (e) {} }
   const root = document.documentElement;
@@ -1099,7 +1099,7 @@ function closeSheet(bg) {
     h += '<h3 class="cols-h">分栏（宽屏）</h3><div class="seg gj-tabs cols-seg">' + [1, 2, 3, 4].map(function (n) { return '<button type="button" data-cols="' + n + '" aria-pressed="' + (effCols() === n) + '">' + n + ' 列</button>'; }).join('') + '</div>';
     h += '<h3>字体大小 <b class="rv" id="fsV">' + Math.round((st.fs || 1) * 100) + '%</b></h3><input type="range" class="rg" id="fsR" min="0.8" max="1.5" step="0.02" value="' + (st.fs || 1) + '" aria-label="字体大小">';
     h += '<h3>点读声音</h3><div class="seg gj-tabs">' + [['k', 'Keita(男)'], ['g', 'Google(女)']].map(function (x) { return '<button type="button" data-voice="' + x[0] + '" aria-pressed="' + (window.__voice === x[0]) + '">' + x[1] + '</button>'; }).join('') + '</div>';
-    h += '<h3>顶栏</h3><div class="tg-list"><label class="tg" data-ah="1"><span>上滑时自动隐藏</span><input type="checkbox" class="sw-in" switch ' + (st.autohide !== false ? 'checked' : '') + '></label>' + (compactAllowed() ? '<label class="tg" data-cp="1"><span>紧凑模式（顶栏一行、小按钮）</span><input type="checkbox" class="sw-in" switch ' + (!!st.compact ? 'checked' : '') + '></label>' : '') + '<label class="tg" data-lk="1"><span>显示「锁定」按钮（固定顶栏当前状态）</span><input type="checkbox" class="sw-in" switch ' + (!!st.lockShow ? 'checked' : '') + '></label></div>';
+    h += '<h3>顶栏</h3><div class="tg-list">' + (compactAllowed() ? '<label class="tg" data-cp="1"><span>紧凑模式（顶栏一行、小按钮）</span><input type="checkbox" class="sw-in" switch ' + (!!st.compact ? 'checked' : '') + '></label>' : '') + '<label class="tg" data-lk="1"><span>显示「锁定」按钮（固定顶栏当前状态）</span><input type="checkbox" class="sw-in" switch ' + (!!st.lockShow ? 'checked' : '') + '></label></div>';
     h += '<h3>动画速度 <b class="rv" id="anV">' + (st.noanim ? '关闭' : '×' + (st.anim || 1).toFixed(1)) + '</b></h3><input type="range" class="rg" id="anR" min="0.4" max="2.4" step="0.1" value="' + (st.anim || 1) + '" ' + (st.noanim ? 'disabled' : '') + ' aria-label="动画速度"><div class="tg-list" style="margin-top:10px"><label class="tg" data-noanim="1"><span>关闭动画</span><input type="checkbox" class="sw-in" switch ' + (!!st.noanim ? 'checked' : '') + '></label></div>';
     h += '<h3>显示的按钮</h3><div class="tg-list">' + ITEMS.map(function (it) {
       return '<label class="tg" data-tg="' + it[0] + '"><span>' + it[1] + '</span><input type="checkbox" class="sw-in" switch ' + (!st.hidden[it[0]] ? 'checked' : '') + '></label>';
@@ -1124,7 +1124,6 @@ function closeSheet(bg) {
     else if (t.dataset.noanim) { st.noanim = !st.noanim; }
     else if (t.dataset.cp) { st.compact = !st.compact; }
     else if (t.dataset.lk) { st.lockShow = !st.lockShow; if (!st.lockShow) st.lock = false; }
-    else if (t.dataset.ah) { st.autohide = st.autohide === false; if (!st.autohide) window.__showBar(); }
     else if (t.dataset.tg) {
       const id = t.dataset.tg, hide = !st.hidden[id];
       st.hidden[id] = hide;
@@ -1143,7 +1142,7 @@ function closeSheet(bg) {
     else if (t.dataset.th) st.theme = t.dataset.th;
     else if (t.dataset.pc !== undefined) st.pitch = t.dataset.pc;
     else if (t.id === 'brushB') st.brush = !st.brush;
-    else if (t.id === 'stReset') st = { mode: 'auto', theme: 'auto', pitch: '', brush: false, hidden: {}, anim: 1, fs: 1, cols: 1, autohide: true, compact: false, lock: false, lockShow: false, custom: '#2c4a9a' };
+    else if (t.id === 'stReset') st = { mode: 'auto', theme: 'auto', pitch: '', brush: false, hidden: {}, anim: 1, fs: 1, cols: 1, compact: false, lock: false, lockShow: false, custom: '#2c4a9a' };
     else return;
     save(); apply(); if (!keep) draw();
   }
@@ -1250,7 +1249,7 @@ function closeSheet(bg) {
       if (now < quiet || (!touching && now - lastTouch > 2500)) { lastY = y; lastT = now; acc = 0; if (y < h) setHid(false, 400); return; }  /* scroll not caused by the finger (reflow, button taps) */
       const dy = y - lastY, dt = Math.max(1, now - lastT); lastY = y; lastT = now;
       v = v * 0.5 + Math.abs(dy) / dt * 1000 * 0.5;    /* px/s, lightly smoothed */
-      if (st.autohide === false || chain || y < h) { acc = 0; setHid(false, 400); return; }
+      if (chain || y < h) { acc = 0; setHid(false, 400); return; }
       if (dy * acc < 0) acc = 0;
       acc += dy;
       const ms = Math.max(200, Math.min(700, 760 - v * 0.28));
