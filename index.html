@@ -1115,6 +1115,15 @@ function closeSheet(bg) {
   const lockB = document.createElement('button'); lockB.type = 'button'; lockB.className = 'lockb'; lockB.id = 'lockB';
   lockB.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2.5" fill="currentColor" fill-opacity=".15"/><path class="shk" d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>';
   document.body.appendChild(lockB);
+  /* one friendly "swipe sensitivity" level (0 = hard to trigger ... 10 = easy) drives both the distance and how flat the swipe must be */
+  function swLevel() {
+    if (st.swLevel != null) return st.swLevel;
+    if (st.swDist) return Math.max(0, Math.min(10, Math.round((120 - st.swDist) / 8.75)));
+    return 8;
+  }
+  function swLabel(l) { return l <= 2 ? '很不灵敏' : l <= 5 ? '偏迟钝' : l <= 8 ? '适中' : '很灵敏'; }
+  function swDist() { return 120 - 8.75 * swLevel(); }
+  function swRatio() { return 2.4 - 0.1375 * swLevel(); }
   /* swipe left / right anywhere on the page to go to the next / previous lesson (only clearly horizontal swipes; no wrap-around) */
   (function () {
     let x0 = 0, y0 = 0, t0 = 0, sy = 0, ok = false;
@@ -1139,15 +1148,15 @@ function closeSheet(bg) {
     document.addEventListener('touchmove', function (e) {
       if (!ok) return;
       if (e.touches.length !== 1) { ok = false; return; }
-      const t = e.touches[0], dx = Math.abs(t.clientX - x0), dy = Math.abs(t.clientY - y0), r = st.swRatio || 1.3;
+      const t = e.touches[0], dx = Math.abs(t.clientX - x0), dy = Math.abs(t.clientY - y0), r = swRatio();
       if (!lock && dx + dy > 10) lock = dx >= dy * r ? 'h' : (dy > dx ? 'v' : '');
       if (lock === 'v') { ok = false; return; }
       if (lock === 'h' && e.cancelable) e.preventDefault();
     }, { passive: false });
     document.addEventListener('touchend', function (e) {
       if (!ok) return; ok = false;
-      const t = e.changedTouches[0], dx = t.clientX - x0, dy = t.clientY - y0, r = st.swRatio || 1.3;
-      if (Date.now() - t0 > 1500 || Math.abs(dx) < (st.swDist || 50) || Math.abs(dx) < Math.abs(dy) * r || Math.abs(window.scrollY - sy) > 24) return;
+      const t = e.changedTouches[0], dx = t.clientX - x0, dy = t.clientY - y0, r = swRatio();
+      if (Date.now() - t0 > 1500 || Math.abs(dx) < swDist() || Math.abs(dx) < Math.abs(dy) * r || Math.abs(window.scrollY - sy) > 24) return;
       const n = cur + (dx < 0 ? 1 : -1);
       if (n < 1 || n > LESSONS.length || switching) return;
       window.__keepScroll = st.swipeTop === false;
@@ -1231,7 +1240,7 @@ function closeSheet(bg) {
     h += '<h3>字体大小 <b class="rv" id="fsV">' + Math.round((st.fs || 1) * 100) + '%</b></h3><input type="range" class="rg" id="fsR" min="0.8" max="1.5" step="0.02" value="' + (st.fs || 1) + '" aria-label="字体大小">';
     h += '<h3>静音</h3><div class="tg-list"><label class="tg" data-mu="1"><span>静音模式（点单词不出声，隐藏喇叭、连续播放、语速）</span><input type="checkbox" class="sw-in" switch ' + (!!st.mute ? 'checked' : '') + '></label></div>';
     h += '<h3>左右滑动切课</h3><div class="tg-list"><label class="tg" data-sw="1"><span>切课后回到第一个单词（关闭则停在当前位置）</span><input type="checkbox" class="sw-in" switch ' + (st.swipeTop !== false ? 'checked' : '') + '></label></div>';
-    h += '<h3>滑动距离 <b class="rv" id="swDV">' + (st.swDist || 50) + 'px</b></h3><input type="range" class="rg" id="swD" min="30" max="140" step="5" value="' + (st.swDist || 50) + '" aria-label="滑动距离"><h3>横竖比 <b class="rv" id="swRV">' + (st.swRatio || 1.3).toFixed(1) + '×</b></h3><input type="range" class="rg" id="swR" min="1" max="3" step="0.1" value="' + (st.swRatio || 1.3) + '" aria-label="横竖比"><div class="st-row" style="margin-top:10px"><button type="button" class="chip" id="swRst">恢复滑动默认</button></div>';
+    h += '<h3>滑动灵敏度 <b class="rv" id="swLV">' + swLabel(swLevel()) + '</b></h3><input type="range" class="rg" id="swL" min="0" max="10" step="1" value="' + swLevel() + '" aria-label="滑动灵敏度"><div style="display:flex;justify-content:space-between;font-size:12px;color:var(--ink-soft);margin-top:2px"><span>不容易触发</span><span>很容易触发</span></div><div style="font-size:12px;color:var(--ink-soft);margin-top:6px">斜着滑老是不灵，就往右拉。</div><div class="st-row" style="margin-top:10px"><button type="button" class="chip" id="swRst">恢复默认灵敏度</button></div>';
     h += '<h3>点读声音</h3><div class="seg gj-tabs">' + [['k', 'Keita(男)'], ['g', 'Google(女)']].map(function (x) { return '<button type="button" data-voice="' + x[0] + '" aria-pressed="' + (window.__voice === x[0]) + '">' + x[1] + '</button>'; }).join('') + '</div>';
     h += '<h3>顶栏</h3><div class="tg-list">' + (compactAllowed() ? '<label class="tg" data-cp="1"><span>紧凑模式（顶栏一行、小按钮）</span><input type="checkbox" class="sw-in" switch ' + (!!st.compact ? 'checked' : '') + '></label>' : '') + '<label class="tg" data-lk="1"><span>显示「锁定」按钮（固定顶栏当前状态）</span><input type="checkbox" class="sw-in" switch ' + (!!st.lockShow ? 'checked' : '') + '></label></div>';
     h += '<h3>动画速度 <b class="rv" id="anV">' + (st.noanim ? '关闭' : '×' + (st.anim || 1).toFixed(1)) + '</b></h3><input type="range" class="rg" id="anR" min="0.4" max="2.4" step="0.1" value="' + (st.anim || 1) + '" ' + (st.noanim ? 'disabled' : '') + ' aria-label="动画速度"><div class="tg-list" style="margin-top:10px"><label class="tg" data-noanim="1"><span>关闭动画</span><input type="checkbox" class="sw-in" switch ' + (!!st.noanim ? 'checked' : '') + '></label></div>';
@@ -1278,7 +1287,7 @@ function closeSheet(bg) {
     else if (t.dataset.th) st.theme = t.dataset.th;
     else if (t.dataset.pc !== undefined) st.pitch = t.dataset.pc;
     else if (t.id === 'brushB') st.brush = !st.brush;
-    else if (t.id === 'swRst') { delete st.swDist; delete st.swRatio; }
+    else if (t.id === 'swRst') { delete st.swDist; delete st.swRatio; delete st.swLevel; }
     else if (t.id === 'stReset') st = { mode: 'auto', theme: 'auto', pitch: '', brush: false, hidden: {}, anim: 1, fs: 1, cols: 1, compact: false, lock: false, lockShow: false, custom: '#2c4a9a' };
     else return;
     save(); apply(); if (!keep) draw();
@@ -1286,13 +1295,12 @@ function closeSheet(bg) {
   bg.addEventListener('input', function (e) {
     const id = e.target.id;
     if (id === 'fsR') { st.fs = Number(e.target.value); root.style.setProperty('--fs', String(st.fs)); bg.querySelector('#fsV').textContent = Math.round(st.fs * 100) + '%'; }
-    else if (id === 'swD') { st.swDist = Number(e.target.value); bg.querySelector('#swDV').textContent = st.swDist + 'px'; }
-    else if (id === 'swR') { st.swRatio = Number(e.target.value); bg.querySelector('#swRV').textContent = st.swRatio.toFixed(1) + '\u00d7'; }
+    else if (id === 'swL') { st.swLevel = Number(e.target.value); delete st.swDist; delete st.swRatio; bg.querySelector('#swLV').textContent = swLabel(st.swLevel); }
     else if (id === 'anR') { st.anim = Number(e.target.value); bg.querySelector('#anV').textContent = '\u00d7' + st.anim.toFixed(1); }
   });
   bg.addEventListener('change', function (e) {
     if (e.target.id === 'fsR' || e.target.id === 'anR') { save(); apply(); }
-    else if (e.target.id === 'swD' || e.target.id === 'swR') { save(); }
+    else if (e.target.id === 'swL') { save(); }
   });
   bg.addEventListener('input', function (e) {
     if (e.target.id !== 'thIn') return;
