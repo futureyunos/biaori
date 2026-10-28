@@ -457,8 +457,16 @@ function trackFor(n) {
   TRACKS[ck] = { url: URL.createObjectURL(new Blob([u8], { type: 'audio/mpeg' })), tl: tl };
   return TRACKS[ck];
 }
-function loadAudio(n) { trackFor(n); return Promise.resolve(); }
+var playerUsed = false;
+function preloadTrack(n) {                          /* load the lesson's continuous track while idle so play-all starts at once */
+  const tr = trackFor(n);
+  if (!tr || chain || !player.paused || player.getAttribute('data-trk') === tr.url) return;
+  player.preload = 'auto'; player.src = tr.url; player.setAttribute('data-trk', tr.url);
+  try { player.load(); } catch (e) {}
+}
+function loadAudio(n) { if (n === cur) preloadTrack(n); return Promise.resolve(); }
 function startAt(tr, t) {
+  playerUsed = true;
   const fresh = player.getAttribute('data-trk') !== tr.url;
   if (fresh) { player.src = tr.url; player.setAttribute('data-trk', tr.url); }
   player.playbackRate = rate < 0.7 ? 0.7 : 1;
@@ -467,6 +475,116 @@ function startAt(tr, t) {
   if (!fresh && player.readyState >= 1) seek(); else player.addEventListener('loadedmetadata', seek, { once: true });
   return player.play();
 }
+/* ---------- Web Audio: decoded buffers, no media element, so no lock-screen entry and no load delay on tap ---------- */
+var AC = window.AudioContext || window.webkitAudioContext;
+var actx = null, waSrc = null;
+try { if (AC) actx = new AC(); } catch (e) { actx = null; }
+try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}    /* keep sound on with the ring/silent switch on */
+function waUnlock() {
+  if (!actx) return;
+  try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}
+  if (actx.state !== 'running') { try { var p = actx.resume(); if (p && p.catch) p.catch(function () {}); } catch (e) {} }
+  if (!actx._u) {
+    actx._u = 1;
+    try { var b = actx.createBuffer(1, 1, 22050), s = actx.createBufferSource(); s.buffer = b; s.connect(actx.destination); s.start(0); } catch (e) {}
+  }
+}
+['touchend', 'pointerup', 'click', 'keydown'].forEach(function (e) { document.addEventListener(e, waUnlock, { capture: true, passive: true }); });
+document.addEventListener('visibilitychange', function () { if (!document.hidden) waUnlock(); });
+function waDecode(b64) {
+  const bin = atob(b64), u8 = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+  return new Promise(function (res, rej) {
+    const p = actx.decodeAudioData(u8.buffer, res, rej);
+    if (p && p.then) p.then(res, rej);
+  });
+}
+/* WSOLA time stretch (slow mode without lowering the pitch), run in small slices so the page stays responsive */
+function waStretch(buf, rt) {
+  return new Promise(function (resolve) {
+    const sr = buf.sampleRate, x = buf.getChannelData(0), len = x.length;
+    const N = Math.round(sr * 0.032) & ~1, Hs = N >> 1, tol = Math.round(sr * 0.012), Ha = Hs * rt;
+    const dec = Math.max(1, Math.round(sr / 8000));
+    const frames = Math.ceil(len / Ha) + 1, outLen = (frames - 1) * Hs + N;
+    const y = new Float32Array(outLen), w = new Float32Array(outLen), win = new Float32Array(N);
+    for (let i = 0; i < N; i++) win[i] = 0.5 - 0.5 * Math.cos(2 * Math.PI * i / N);
+    let frame = 0, prev = 0;
+    (function step() {
+      const t0 = performance.now();
+      while (frame < frames) {
+        const target = Math.round(frame * Ha);
+        let pos = target;
+        if (frame > 0) {
+          const ref = prev + Hs;
+          let best = -Infinity, bd = 0;
+          for (let d = -tol; d <= tol; d += dec) {
+            const c = target + d;
+            if (c < 0 || c + N > len || ref + N > len) continue;
+            let s = 0;
+            for (let i = 0; i < N; i += dec) s += x[ref + i] * x[c + i];
+            if (s > best) { best = s; bd = d; }
+          }
+          pos = target + bd;
+        }
+        const o = frame * Hs;
+        for (let i = 0; i < N; i++) { const idx = pos + i; y[o + i] += (idx < len ? x[idx] : 0) * win[i]; w[o + i] += win[i]; }
+        prev = pos; frame++;
+        if (performance.now() - t0 > 15) { setTimeout(step, 0); return; }
+      }
+      for (let i = 0; i < outLen; i++) if (w[i] > 1e-3) y[i] /= w[i];
+      const out = actx.createBuffer(1, outLen, sr);
+      out.copyToChannel(y, 0);
+      resolve(out);
+    })();
+  });
+}
+var WA = {};                                       /* voice+lesson -> { w: [Promise<AudioBuffer>], tr: Promise, slow: {} } */
+function waEntry(n) {
+  const v = window.__voice, ck = v + n;
+  if (WA[ck]) return WA[ck];
+  Object.keys(WA).forEach(function (k) { delete WA[k]; });      /* keep one lesson in memory */
+  const wd = window.__WD && window.__WD[v] && window.__WD[v][n], tr = window.__PACKS && window.__PACKS[v] && window.__PACKS[v][n];
+  if (!wd || !tr) return null;
+  WA[ck] = { w: wd.map(function (b) { return null; }), wd: wd, trb: tr, tr: null, slow: {} };
+  return WA[ck];
+}
+function waWordBuf(e, i) { return e.w[i] || (e.w[i] = waDecode(e.wd[i])); }
+function waPrepare(n) {
+  if (!actx) return;
+  const e = waEntry(n); if (!e) return;
+  setTimeout(function () {
+    if (WA[window.__voice + n] !== e) return;
+    Promise.all(e.wd.map(function (b, i) { return waWordBuf(e, i); })).then(function () {}).catch(function () {});
+  }, 150);
+}
+function waSlow() { return rate < 0.7; }
+function waStopWord() {
+  if (waSrc) { const s = waSrc; waSrc = null; s.onended = null; try { s.stop(); } catch (e) {} }
+}
+function waStopAll() { waStopWord(); }
+function waWord(i, my, finish, fallback) {
+  const e = waEntry(cur);
+  if (!e || !e.wd[i]) { fallback(); return; }
+  const slow = waSlow();
+  const ready = function (buf) {
+    if (my !== token) return;
+    const go = function () {
+      if (my !== token) return;
+      waStopWord();
+      const s = actx.createBufferSource(); s.buffer = buf; s.connect(actx.destination);
+      s.onended = function () { if (waSrc === s) waSrc = null; finish(true); };
+      waSrc = s; s.start(0);
+    };
+    if (actx.state === 'running') go();
+    else { const p = actx.resume(); if (p && p.then) p.then(go, function () { if (my === token) fallback(); }); else go(); }
+  };
+  waWordBuf(e, i).then(function (buf) {
+    if (!slow) { ready(buf); return; }
+    const k = 'w' + i;
+    (e.slow[k] || (e.slow[k] = waStretch(buf, 0.7))).then(ready);
+  }).catch(function () { if (my === token) fallback(); });
+}
+
 /* tapping one word plays that word's own small recording; independent of the continuous track used by play-all */
 const WELS = {};                                    /* voice+lesson -> [blob URL per row] */
 const wordEl = new Audio();                         /* one shared element: iOS keeps it unlocked, and no pile of media players */
@@ -518,7 +636,7 @@ function speak(item, done) {
   const my = ++token;
   stopWord();
   if (synth) synth.cancel();
-  releaseMedia(player);
+  if (playerUsed) { playerUsed = false; releaseMedia(player); }
   clearPlaying();
   item.el.classList.add('playing');
   const finish = function (ok) {
@@ -536,6 +654,7 @@ function speak(item, done) {
     u.onerror = function () { finish(false); };
     setTimeout(function () { if (my === token) synth.speak(u); }, 30);
   };
+  if (actx && item.t >= 0) { waWord(item.t, my, finish, tts); return; }
   const url = wordAudio(item.t);
   if (!url) { tts(); return; }
   playWord(url, my, finish, tts);
@@ -548,9 +667,9 @@ function paintPlay() {
   b.classList.toggle('on', chain); b.classList.toggle('paused', !chain && playState.paused);
 }
 function stopAll() {
-  chain = false; token++; cancelAnimationFrame(watch); stopWord();
+  chain = false; token++; cancelAnimationFrame(watch); stopWord(); waStopAll();
   if (synth) synth.cancel();
-  releaseMedia(player);
+  if (playerUsed) { playerUsed = false; releaseMedia(player); setTimeout(function () { if (!chain && tab === 'words') preloadTrack(cur); }, 400); }
   clearPlaying();
   playState = { list: null, i: 0, paused: false }; paintPlay();
 }
@@ -686,7 +805,7 @@ function render() {
   stopAll(); rows = []; app.innerHTML = '';
   const L = LESSONS[cur - 1];
   /* decoding the lesson's audio is heavy and only needed when something is played: do it after the page is on screen, not inside the lesson switch */
-  if (tab === 'words') { const n0 = cur; setTimeout(function () { if (cur === n0) { loadAudio(n0); wordAudio(0); } }, 1000); }
+  if (tab === 'words') { const n0 = cur; setTimeout(function () { if (cur === n0) { loadAudio(n0); if (!actx) wordAudio(0); waPrepare(n0); } }, 1000); }
   document.getElementById('hTitle').textContent = '第' + cur + '课';
   document.getElementById('hJp').textContent = L.title;
   ['hTitle', 'hJp'].forEach(function (id, k) { const el = document.getElementById(id); if (el.animate && el.dataset.shown) el.animate([{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'none' }], { duration: 600 * AM(), delay: k * 60 * AM(), easing: 'cubic-bezier(.16,1,.3,1)', fill: 'backwards' }); el.dataset.shown = '1'; });
@@ -829,7 +948,7 @@ document.getElementById('playAll').addEventListener('click', function () {
   if (!rows.length) return;
   if (!playState.paused || !playState.list) playState = { list: rows.slice(), i: 0, paused: false };
   playState.paused = false;
-  chain = true; paintPlay();
+  chain = true; paintPlay(); waStopWord();
   const tr = tab === 'words' ? trackFor(cur) : null;
   if (tr && tr.tl.length === rows.length) {            /* one continuous recording: highlight and scroll follow its timestamps */
     const my = ++token, tl = tr.tl;
@@ -1345,7 +1464,7 @@ function closeSheet(bg) {
       }
       if (!hide) delete st.hidden[id];
     }
-    else if (t.dataset.voice) { window.__voice = t.dataset.voice; try { localStorage.setItem(VKEY, window.__voice); } catch (e) {} stopAll(); }
+    else if (t.dataset.voice) { window.__voice = t.dataset.voice; try { localStorage.setItem(VKEY, window.__voice); } catch (e) {} stopAll(); waPrepare(cur); preloadTrack(cur); }
     else if (t.dataset.mode) st.mode = t.dataset.mode;
     else if (t.dataset.th) st.theme = t.dataset.th;
     else if (t.dataset.pc !== undefined) st.pitch = t.dataset.pc;
