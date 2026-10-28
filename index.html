@@ -785,7 +785,8 @@ function switchLesson(n) {
   window.__moveInd(n, true);
   try { history.replaceState(null, '', '#l' + n); } catch (e) {}
   const app = document.getElementById('app');
-  const go = function () { cur = n; render(); window.scrollTo(0, 0); switching = 0; };
+  const keep = window.__keepScroll; window.__keepScroll = false; const y0 = window.scrollY;
+  const go = function () { cur = n; render(); window.scrollTo(0, keep ? y0 : 0); switching = 0; };
   if (!app.animate) { go(); return; }
   const out = app.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(-12px) scale(.985)' }], { duration: 200 * AM(), easing: 'cubic-bezier(.4,0,1,1)', fill: 'forwards' });
   out.onfinish = function () { go(); out.cancel(); };
@@ -1102,6 +1103,36 @@ function closeSheet(bg) {
   const lockB = document.createElement('button'); lockB.type = 'button'; lockB.className = 'lockb'; lockB.id = 'lockB';
   lockB.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2.5" fill="currentColor" fill-opacity=".15"/><path class="shk" d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>';
   document.body.appendChild(lockB);
+  /* swipe left / right anywhere on the page to go to the next / previous lesson (only clearly horizontal swipes; no wrap-around) */
+  (function () {
+    let x0 = 0, y0 = 0, t0 = 0, sy = 0, ok = false;
+    function blocked(el) {
+      if (document.querySelector('.gj-bg.on') || document.body.classList.contains('colsbusy')) return true;
+      for (let e = el; e && e !== document.body; e = e.parentElement) {
+        const tg = e.tagName;
+        if (tg === 'INPUT' || tg === 'TEXTAREA' || tg === 'SELECT' || e.id === 'lockB' || e.isContentEditable) return true;
+        if (e.scrollWidth > e.clientWidth + 2 && /(auto|scroll)/.test(getComputedStyle(e).overflowX)) return true;
+      }
+      return false;
+    }
+    document.addEventListener('touchstart', function (e) {
+      ok = false;
+      if (e.touches.length !== 1) return;
+      const t = e.touches[0];
+      if (t.clientX < 24 || t.clientX > innerWidth - 24 || blocked(e.target)) return;
+      x0 = t.clientX; y0 = t.clientY; t0 = Date.now(); sy = window.scrollY; ok = true;
+    }, { passive: true });
+    document.addEventListener('touchmove', function (e) { if (e.touches.length !== 1) ok = false; }, { passive: true });
+    document.addEventListener('touchend', function (e) {
+      if (!ok) return; ok = false;
+      const t = e.changedTouches[0], dx = t.clientX - x0, dy = t.clientY - y0;
+      if (Date.now() - t0 > 900 || Math.abs(dx) < 70 || Math.abs(dx) < Math.abs(dy) * 2 || Math.abs(window.scrollY - sy) > 8) return;
+      const n = cur + (dx < 0 ? 1 : -1);
+      if (n < 1 || n > LESSONS.length || switching) return;
+      window.__keepScroll = st.swipeTop === false;
+      switchLesson(n);
+    }, { passive: true });
+  })();
   /* long-press the lock button (about 0.4 s) to drag it; the spot is remembered, a plain tap still locks */
   let lpos = null, dragged = false;
   try { lpos = JSON.parse(localStorage.getItem('biaori-lockpos') || 'null'); } catch (e) {}
@@ -1178,6 +1209,7 @@ function closeSheet(bg) {
     h += '<h3 class="cols-h">分栏（宽屏）</h3><div class="seg gj-tabs cols-seg">' + [1, 2, 3, 4].map(function (n) { return '<button type="button" data-cols="' + n + '" aria-pressed="' + (effCols() === n) + '">' + n + ' 列</button>'; }).join('') + '</div>';
     h += '<h3>字体大小 <b class="rv" id="fsV">' + Math.round((st.fs || 1) * 100) + '%</b></h3><input type="range" class="rg" id="fsR" min="0.8" max="1.5" step="0.02" value="' + (st.fs || 1) + '" aria-label="字体大小">';
     h += '<h3>静音</h3><div class="tg-list"><label class="tg" data-mu="1"><span>静音模式（点单词不出声，隐藏喇叭、连续播放、语速）</span><input type="checkbox" class="sw-in" switch ' + (!!st.mute ? 'checked' : '') + '></label></div>';
+    h += '<h3>左右滑动切课</h3><div class="tg-list"><label class="tg" data-sw="1"><span>切课后回到第一个单词（关闭则停在当前位置）</span><input type="checkbox" class="sw-in" switch ' + (st.swipeTop !== false ? 'checked' : '') + '></label></div>';
     h += '<h3>点读声音</h3><div class="seg gj-tabs">' + [['k', 'Keita(男)'], ['g', 'Google(女)']].map(function (x) { return '<button type="button" data-voice="' + x[0] + '" aria-pressed="' + (window.__voice === x[0]) + '">' + x[1] + '</button>'; }).join('') + '</div>';
     h += '<h3>顶栏</h3><div class="tg-list">' + (compactAllowed() ? '<label class="tg" data-cp="1"><span>紧凑模式（顶栏一行、小按钮）</span><input type="checkbox" class="sw-in" switch ' + (!!st.compact ? 'checked' : '') + '></label>' : '') + '<label class="tg" data-lk="1"><span>显示「锁定」按钮（固定顶栏当前状态）</span><input type="checkbox" class="sw-in" switch ' + (!!st.lockShow ? 'checked' : '') + '></label></div>';
     h += '<h3>动画速度 <b class="rv" id="anV">' + (st.noanim ? '关闭' : '×' + (st.anim || 1).toFixed(1)) + '</b></h3><input type="range" class="rg" id="anR" min="0.4" max="2.4" step="0.1" value="' + (st.anim || 1) + '" ' + (st.noanim ? 'disabled' : '') + ' aria-label="动画速度"><div class="tg-list" style="margin-top:10px"><label class="tg" data-noanim="1"><span>关闭动画</span><input type="checkbox" class="sw-in" switch ' + (!!st.noanim ? 'checked' : '') + '></label></div>';
@@ -1203,6 +1235,7 @@ function closeSheet(bg) {
     if (t.dataset.cols) { st.cols = Number(t.dataset.cols); }
     else if (t.dataset.noanim) { st.noanim = !st.noanim; }
     else if (t.dataset.cp) { st.compact = !st.compact; }
+    else if (t.dataset.sw) { st.swipeTop = st.swipeTop === false; }
     else if (t.dataset.mu) { st.mute = !st.mute; if (st.mute) stopAll(); }
     else if (t.dataset.lk) { st.lockShow = !st.lockShow; if (!st.lockShow) st.lock = false; }
     else if (t.dataset.tg) {
