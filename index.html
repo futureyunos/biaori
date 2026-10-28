@@ -1405,8 +1405,9 @@ function closeSheet(bg) {
       if (!tJp.animate || (!dx && !dy)) return;
       anim = tJp.animate([{ transform: 'translate(' + dx + 'px,' + dy + 'px)' }, { transform: 'none' }], { duration: ms, easing: EASE });
     }
+    let fold = false;   /* folded by hand (swipe/drag/scroll on the bar): the bar's space goes back to the content, like when locked */
     function setHid(nv, ms) {
-      if (nv === hid) return; hid = nv;
+      if (nv === hid) return; hid = nv; if (!nv) fold = false;
       ms = Math.round((ms || 600) * AM());
       bar.style.setProperty('--bd', ms + 'ms');
       const shown = tJp.style.display !== 'none';
@@ -1435,7 +1436,7 @@ function closeSheet(bg) {
       if (bar.animate) bar.animate([{ marginBottom: from + 'px' }, { marginBottom: to + 'px' }], { duration: Math.round(560 * AM()), easing: EASE });
     }
     function sync() {
-      const want = !!st.lock && hid, y = window.scrollY;
+      const want = (!!st.lock || fold) && hid, y = window.scrollY;
       if (want && !col) {
         col = true; colH = bar.offsetHeight;
         if (y >= colH) { bar.style.marginBottom = -colH + 'px'; window.scrollTo(0, y - colH); lastY = window.scrollY; }
@@ -1456,7 +1457,7 @@ function closeSheet(bg) {
     bar.addEventListener('touchmove', function (e) {
       if (!ty || st.lock || hid) return;
       const dy = e.touches[0].clientY - ty[0], dx = e.touches[0].clientX - ty[1];
-      if (dy < -28 && -dy > Math.abs(dx) * 1.5) { ty = null; acc = 0; quiet = tn() + 700; setHid(true, 500); }
+      if (dy < -28 && -dy > Math.abs(dx) * 1.5) { ty = null; acc = 0; quiet = tn() + 700; foldUp(); }
     }, { passive: true });
     let md = null, wacc = 0, wt = 0;   /* the same on desktop: drag up with the mouse, or scroll down on the trackpad, while the pointer is on the bar */
     bar.addEventListener('mousedown', function (e) { md = e.button === 0 ? [e.clientY, e.clientX] : null; });
@@ -1465,16 +1466,21 @@ function closeSheet(bg) {
       if (!md || st.lock || hid) return;
       const dy = e.clientY - md[0], dx = e.clientX - md[1];
       if (dy < -28 && -dy > Math.abs(dx) * 1.5) {
-        md = null; acc = 0; quiet = tn() + 700; setHid(true, 500);
+        md = null; acc = 0; quiet = tn() + 700; foldUp();
         const sw = function (ev) { ev.stopPropagation(); ev.preventDefault(); }; window.addEventListener('click', sw, { capture: true, once: true }); setTimeout(function () { window.removeEventListener('click', sw, true); }, 400);
       }
     });
     bar.addEventListener('wheel', function (e) {
       if (st.lock || hid || e.ctrlKey || Math.abs(e.deltaY) < Math.abs(e.deltaX)) return;
       const t = tn(); if (t - wt > 300) wacc = 0; wt = t; wacc += e.deltaY;
-      if (wacc > 40) { wacc = 0; acc = 0; quiet = tn() + 700; setHid(true, 500); }
+      if (wacc > 40) { wacc = 0; acc = 0; quiet = tn() + 700; foldUp(); }
     }, { passive: true });
     window.__quietBar = function (ms) { quiet = tn() + ms; lastTouch = -1e9; };   /* a lesson switch moves the scroll position by itself: keep the bar as it is */
+    function foldUp() { if (st.lock || hid) return; acc = 0; quiet = tn() + 700; fold = true; setHid(true, 500); }
+    let py = 0;   /* folded at the very top there is no scrolling to bring it back: pulling down / wheeling up does */
+    window.addEventListener('touchstart', function (e) { py = e.touches[0].clientY; }, { passive: true });
+    window.addEventListener('touchmove', function (e) { if (fold && hid && window.scrollY <= 0 && e.touches[0].clientY - py > 24) setHid(false, 500); }, { passive: true });
+    window.addEventListener('wheel', function (e) { if (fold && hid && window.scrollY <= 0 && e.deltaY < -10 && Math.abs(e.deltaY) > Math.abs(e.deltaX)) setHid(false, 500); }, { passive: true });
     function check(now) {
       ticking = false;
       if (st.lock || document.body.classList.contains('colsbusy')) { lastY = window.scrollY; lastT = now; acc = 0; return; }   /* no layout reads while columns change / locked */
@@ -1482,10 +1488,10 @@ function closeSheet(bg) {
       const y = Math.min(window.scrollY, max);         /* clamp: bottom rubber-band reads as no movement */
       if (y < 0) return;                               /* iOS rubber-band bounce */
       if (st.lock || document.body.classList.contains('colsbusy')) { lastY = y; lastT = now; acc = 0; return; }   /* locked: the bar stays as it is */
-      if (now < quiet || (!touching && now - lastTouch > 2500)) { lastY = y; lastT = now; acc = 0; if (y < h) setHid(false, 400); return; }  /* scroll not caused by the finger (reflow, button taps) */
+      if (now < quiet || (!touching && now - lastTouch > 2500)) { lastY = y; lastT = now; acc = 0; if (y < h && !fold) setHid(false, 400); return; }  /* scroll not caused by the finger (reflow, button taps) */
       const dy = y - lastY, dt = Math.max(1, now - lastT); lastY = y; lastT = now;
       v = v * 0.5 + Math.abs(dy) / dt * 1000 * 0.5;    /* px/s, lightly smoothed */
-      if (chain || y < h) { acc = 0; setHid(false, 400); return; }
+      if (chain || (y < h && !fold)) { acc = 0; setHid(false, 400); return; }
       if (dy * acc < 0) acc = 0;
       acc += dy;
       const ms = Math.max(200, Math.min(700, 760 - v * 0.28));
