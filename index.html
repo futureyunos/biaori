@@ -57,6 +57,12 @@ header.bar {
   margin-inline: calc(-1 * max(16px, env(safe-area-inset-left, 0px))) calc(-1 * max(16px, env(safe-area-inset-right, 0px)));
   padding: 10px max(16px, env(safe-area-inset-right, 0px)) 10px max(16px, env(safe-area-inset-left, 0px));
 }
+.gj-bg.warm:not(.on) { display: block !important; }   /* settings sheet laid out once while idle (hidden), so the first tap does not pay for it */
+.bar-up { position: absolute; left: 50%; bottom: 0; transform: translateX(-50%); width: 56px; height: 16px; padding: 0; border: 0; background: none; color: var(--ink-soft); opacity: .55; cursor: pointer; display: grid; place-items: center; -webkit-tap-highlight-color: transparent; }
+.bar-up::before { content: ""; width: 8px; height: 8px; border-left: 2px solid currentColor; border-top: 2px solid currentColor; transform: translateY(2px) rotate(45deg); border-radius: 1px; }
+.bar-up:active { opacity: .9; }
+body.locked-bar .bar-up { display: none; }
+header.bar { padding-bottom: calc(10px + 6px); }
 .bar-inner { max-width: 640px; margin: 0 auto; display: flex; flex-direction: column; gap: 8px; }
 .title { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; min-width: 0; }
 .gear { margin-left: auto; width: 34px; height: 34px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 50%; background: var(--card); color: var(--ink-soft); cursor: pointer; padding: 0; align-self: center; }
@@ -798,12 +804,14 @@ var switching = 0;
 function switchLesson(n) {
   if (n === cur || switching) return;
   switching = 1;
+  if (window.__quietBar) window.__quietBar(1400);
   window.__moveInd(n, true);
   try { history.replaceState(null, '', '#l' + n); } catch (e) {}
   const app = document.getElementById('app');
   const keep = window.__keepScroll; window.__keepScroll = false; const y0 = window.scrollY;
   const go = function () {
     cur = n; render(); window.scrollTo(0, keep ? y0 : 0); switching = 0;
+    if (window.__quietBar) window.__quietBar(1000);
     if (keep && y0 > 0) {
       /* the cards fade in one after another from the top of the list; when the page stays scrolled, start that stagger at the first card in view so nothing waits */
       const hb = document.querySelector('header.bar'), edge = hb && !hb.classList.contains('bar-hid') ? hb.getBoundingClientRect().bottom : 0;
@@ -1029,7 +1037,7 @@ function closeSheet(bg) {
     root.style.colorScheme = dk ? 'dark' : 'light';
     barCol = pal.bar; paintBar();
     if (window.__barSync) window.__barSync();
-    lockB.classList.toggle('on', !!st.lockShow); lockB.setAttribute('aria-pressed', String(!!st.lock)); lockB.setAttribute('aria-label', st.lock ? '解除锁定顶栏' : '锁定顶栏'); document.body.classList.toggle('lockshow', !!st.lockShow); document.body.classList.toggle('muted', !!st.mute);
+    lockB.classList.toggle('on', !!st.lockShow); lockB.setAttribute('aria-pressed', String(!!st.lock)); lockB.setAttribute('aria-label', st.lock ? '解除锁定顶栏' : '锁定顶栏'); document.body.classList.toggle('lockshow', !!st.lockShow); document.body.classList.toggle('muted', !!st.mute); document.body.classList.toggle('locked-bar', !!st.lock);
     root.setAttribute('data-theme', dk ? 'dark' : 'light');
     if (st.pitch) root.style.setProperty('--pitch', visiblePitch(st.pitch)); else root.style.removeProperty('--pitch');
     document.body.classList.toggle('brush', !!st.brush);
@@ -1380,6 +1388,7 @@ function closeSheet(bg) {
     st.pitch = e.target.value; save(); apply(); bg.classList.remove('lite'); draw();
   });
   document.getElementById('tSet').addEventListener('click', function () { draw(); openFrom(bg, this); });
+  setTimeout(function () { if (!document.querySelector('.gj-bg.on')) { draw(); bg.classList.add('warm'); bg.querySelector('.gj').getBoundingClientRect(); bg.classList.remove('warm'); } }, 3000);
   try { window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function () { if (st.mode === 'auto') apply(); }); } catch (e) {}
   let rz = 0; window.addEventListener('resize', function () { clearTimeout(rz); rz = setTimeout(function () { const cb = document.getElementById('tCols'); if (cb) Array.prototype.forEach.call(cb.querySelectorAll('button'), function (x) { x.setAttribute('aria-pressed', String(Number(x.dataset.c) === effCols())); }); }, 120); });
   let rz2 = 0; window.addEventListener('resize', function () { clearTimeout(rz2); rz2 = setTimeout(function () { apply(); const sh = document.getElementById('stBody'); if (sh && sh.closest('.gj-bg.on')) draw(); }, 180); });
@@ -1447,6 +1456,16 @@ function closeSheet(bg) {
     }
     window.__barSync = sync; window.addEventListener('resize', sync);
     window.__showBar = function () { acc = 0; setHid(false, 400); };
+    const up = document.createElement('button'); up.type = 'button'; up.className = 'bar-up'; up.setAttribute('aria-label', '收起顶栏'); bar.appendChild(up);
+    up.addEventListener('click', function (e) { e.stopPropagation(); if (!st.lock) { acc = 0; quiet = tn() + 700; setHid(true, 500); } });
+    let ty = null;   /* swipe up on the bar itself folds it away */
+    bar.addEventListener('touchstart', function (e) { ty = e.touches.length === 1 ? [e.touches[0].clientY, e.touches[0].clientX] : null; }, { passive: true });
+    bar.addEventListener('touchmove', function (e) {
+      if (!ty || st.lock || hid) return;
+      const dy = e.touches[0].clientY - ty[0], dx = e.touches[0].clientX - ty[1];
+      if (dy < -28 && -dy > Math.abs(dx) * 1.5) { ty = null; acc = 0; quiet = tn() + 700; setHid(true, 500); }
+    }, { passive: true });
+    window.__quietBar = function (ms) { quiet = tn() + ms; lastTouch = -1e9; };   /* a lesson switch moves the scroll position by itself: keep the bar as it is */
     function check(now) {
       ticking = false;
       if (st.lock || document.body.classList.contains('colsbusy')) { lastY = window.scrollY; lastT = now; acc = 0; return; }   /* no layout reads while columns change / locked */
