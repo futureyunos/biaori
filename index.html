@@ -482,16 +482,28 @@ function wordAudio(i) {
   }
   return arr[i] || null;
 }
-function stopWord() {
-  wordEl.onended = wordEl.onerror = null;
-  try { wordEl.pause(); } catch (e) {}
+/* iOS keeps an element's last track in the lock screen / notification centre; emptying the element and the media session removes it */
+function releaseMedia(el) {
+  el.onended = el.onerror = null;
+  try { el.pause(); } catch (e) {}
+  el.removeAttribute('src'); el.removeAttribute('data-trk');
+  try { el.load(); } catch (e) {}
+  if ('mediaSession' in navigator) {
+    try { navigator.mediaSession.metadata = null; navigator.mediaSession.playbackState = 'none'; } catch (e) {}
+  }
 }
+if ('mediaSession' in navigator) {
+  ['play', 'pause', 'stop', 'seekbackward', 'seekforward', 'seekto', 'previoustrack', 'nexttrack'].forEach(function (a) {
+    try { navigator.mediaSession.setActionHandler(a, null); } catch (e) {}
+  });
+}
+function stopWord() { releaseMedia(wordEl); }
 function playWord(url, my, finish, fallback) {
   stopWord();
   wordEl.src = url;
   wordEl.playbackRate = rate < 0.7 ? 0.7 : 1;
   if ('preservesPitch' in wordEl) wordEl.preservesPitch = true;
-  wordEl.onended = function () { finish(true); };
+  wordEl.onended = function () { stopWord(); finish(true); };
   wordEl.onerror = function () { if (my === token) fallback(); };
   const p = wordEl.play();
   if (p && p.catch) p.catch(function () { if (my === token) fallback(); });
@@ -502,7 +514,7 @@ function speak(item, done) {
   const my = ++token;
   stopWord();
   if (synth) synth.cancel();
-  player.pause();
+  releaseMedia(player);
   clearPlaying();
   item.el.classList.add('playing');
   const finish = function (ok) {
@@ -534,7 +546,7 @@ function paintPlay() {
 function stopAll() {
   chain = false; token++; cancelAnimationFrame(watch); stopWord();
   if (synth) synth.cancel();
-  player.pause();
+  releaseMedia(player);
   clearPlaying();
   playState = { list: null, i: 0, paused: false }; paintPlay();
 }
