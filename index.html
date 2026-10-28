@@ -337,7 +337,7 @@ body.compact header.bar .seg[aria-label="语速"] button { min-width: var(--cw);
 .lrow b { flex: none; min-width: 3.2em; color: var(--accent); }
 .lrow span { font-family: var(--font-jp); color: var(--ink-soft); min-width: 0; overflow-wrap: anywhere; }
 .lrow[aria-pressed="true"] { background: var(--accent-tint); border-color: var(--accent); }
-header.bar { will-change: transform; transition: transform var(--bd, .6s) cubic-bezier(.45,.05,.25,1), background-color calc(.35s * var(--am, 1)) ease, border-color calc(.35s * var(--am, 1)) ease; }
+header.bar { touch-action: pan-x; will-change: transform; transition: transform var(--bd, .6s) cubic-bezier(.45,.05,.25,1), background-color calc(.35s * var(--am, 1)) ease, border-color calc(.35s * var(--am, 1)) ease; }
 .lockb { position: fixed; right: max(14px, env(safe-area-inset-right, 0px)); bottom: calc(env(safe-area-inset-bottom, 0px) + 16px); z-index: 6; width: 44px; height: 44px; padding: 0; border-radius: 50%; border: 1px solid var(--line); background: var(--bar); color: var(--ink-soft); display: grid; place-items: center; cursor: pointer; opacity: 0; visibility: hidden; pointer-events: none; transform: translate3d(0, 14px, 0) scale(.55); will-change: transform, opacity; contain: layout style; box-shadow: 0 2px 10px rgba(0,0,0,.14);
   transition: opacity calc(.3s * var(--am, 1)), transform calc(.45s * var(--am, 1)) cubic-bezier(.2,1.25,.3,1), visibility 0s calc(.45s * var(--am, 1)), background calc(.3s * var(--am, 1)), color calc(.3s * var(--am, 1)), border-color calc(.3s * var(--am, 1)); }
 body.muted .spk, body.muted #playAll, body.muted .seg[aria-label="语速"] { display: none !important; }
@@ -1431,9 +1431,13 @@ function closeSheet(bg) {
     /* locked + hidden: the bar's space in the flow is given back (content moves up to the top edge); unlocking brings it back.
        The layout change is hidden from the reader: below the bar's height the scroll position is shifted by the same amount (no visible jump), at the very top the content glides. */
     let col = false, colH = 0;
-    function glideMargin(from, to) {
+    function glideMargin(from, to) {   /* one layout change; the content then glides with a transform (no per-frame layout) */
       bar.style.marginBottom = to ? to + 'px' : '';
-      if (bar.animate) bar.animate([{ marginBottom: from + 'px' }, { marginBottom: to + 'px' }], { duration: Math.round(560 * AM()), easing: EASE });
+      const mv = [document.getElementById('app'), document.querySelector('.wrap > footer')].filter(Boolean), d = from - to;
+      mv.forEach(function (el) {
+        if (el._ga) el._ga.cancel();
+        if (el.animate) el._ga = el.animate([{ transform: 'translate3d(0,' + d + 'px,0)' }, { transform: 'none' }], { duration: Math.round(560 * AM()), easing: EASE });
+      });
     }
     function sync() {
       const want = (!!st.lock || fold) && hid, y = window.scrollY;
@@ -1472,11 +1476,14 @@ function closeSheet(bg) {
     });
     bar.addEventListener('wheel', function (e) {
       if (st.lock || hid || e.ctrlKey || Math.abs(e.deltaY) < Math.abs(e.deltaX)) return;
+      e.preventDefault();   /* a gesture on the bar only folds it: the content must not scroll along */
       const t = tn(); if (t - wt > 300) wacc = 0; wt = t; wacc += e.deltaY;
       if (wacc > 40) { wacc = 0; acc = 0; quiet = tn() + 700; foldUp(); }
-    }, { passive: true });
+    }, { passive: false });
     window.__quietBar = function (ms) { quiet = tn() + ms; lastTouch = -1e9; };   /* a lesson switch moves the scroll position by itself: keep the bar as it is */
-    function foldUp() { if (st.lock || hid) return; acc = 0; quiet = tn() + 700; fold = true; setHid(true, 500); }
+    let noWheel = 0;   /* the rest of the same wheel gesture must not scroll the content now under the pointer */
+    window.addEventListener('wheel', function (e) { if (tn() < noWheel) e.preventDefault(); }, { passive: false, capture: true });
+    function foldUp() { if (st.lock || hid) return; noWheel = tn() + 450; acc = 0; quiet = tn() + 700; fold = true; setHid(true, 500); }
     let py = 0;   /* folded at the very top there is no scrolling to bring it back: pulling down / wheeling up does */
     window.addEventListener('touchstart', function (e) { py = e.touches[0].clientY; }, { passive: true });
     window.addEventListener('touchmove', function (e) { if (fold && hid && window.scrollY <= 0 && e.touches[0].clientY - py > 24) setHid(false, 500); }, { passive: true });
