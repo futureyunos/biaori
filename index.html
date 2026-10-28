@@ -1177,8 +1177,8 @@ function closeSheet(bg) {
      the bar's real available width (viewport, capped by the column layout's max width) >= 880px it is hidden and ignored */
   const BAR_MAXW = { 1: 640, 2: 1080, 3: 1500, 4: 1900 }, ONE_ROW = 880;
   function compactAllowed() { return Math.min(window.innerWidth, BAR_MAXW[effCols()] || 640) - 40 < ONE_ROW; }
-  let st = { mode: 'auto', theme: 'auto', pitch: '', brush: false, hidden: {}, anim: 1, fs: 1, cols: 1, compact: false, lock: false, lockShow: false, custom: '#2c4a9a' };
-  try { const j = JSON.parse(localStorage.getItem('biaori-look') || 'null'); if (j) st = Object.assign(st, j); st.brush = false; if (!st.hidden) st.hidden = {}; if (!st.anim) st.anim = 1; if (!st.fs) st.fs = 1; if (!st.cols) st.cols = 1; if (!st.mode) st.mode = 'auto'; if (st.theme === 'night') { st.theme = 'auto'; st.mode = 'dark'; } if (st.theme === 'midnight') { st.theme = 'sumi'; st.mode = 'dark'; } if (st.anim >= 50) { st.noanim = true; st.anim = 1; } } catch (e) {}
+  let st = { mode: 'auto', theme: 'auto', pitch: '', brush: false, hidden: {}, anim: 1, fs: 1, cols: 1, compact: false, lock: false, lockShow: true, custom: '#2c4a9a' };
+  try { const j = JSON.parse(localStorage.getItem('biaori-look') || 'null'); if (j) { st = Object.assign(st, j); if (!j.lkSet) st.lockShow = true; }   /* saved before the lock button was shown by default: only a deliberate choice (lkSet) keeps it off */ st.brush = false; if (!st.hidden) st.hidden = {}; if (!st.anim) st.anim = 1; if (!st.fs) st.fs = 1; if (!st.cols) st.cols = 1; if (!st.mode) st.mode = 'auto'; if (st.theme === 'night') { st.theme = 'auto'; st.mode = 'dark'; } if (st.theme === 'midnight') { st.theme = 'sumi'; st.mode = 'dark'; } if (st.anim >= 50) { st.noanim = true; st.anim = 1; } } catch (e) {}
   function save() { try { localStorage.setItem('biaori-look', JSON.stringify(st)); } catch (e) {} }
   const root = document.documentElement;
   const KEYS = ['bg', 'bar', 'card', 'ink', 'ink-soft', 'line', 'accent', 'accent-tint', 'accent-ink'];
@@ -1491,7 +1491,7 @@ function closeSheet(bg) {
     else if (t.dataset.cp) { st.compact = !st.compact; }
     else if (t.dataset.sw) { st.swipeTop = st.swipeTop === false; }
     else if (t.dataset.mu) { st.mute = !st.mute; if (st.mute) stopAll(); }
-    else if (t.dataset.lk) { st.lockShow = !st.lockShow; if (!st.lockShow) st.lock = false; }
+    else if (t.dataset.lk) { st.lockShow = !st.lockShow; st.lkSet = true; if (!st.lockShow) st.lock = false; }
     else if (t.dataset.tg) {
       const id = t.dataset.tg, hide = !st.hidden[id];
       st.hidden[id] = hide;
@@ -1511,7 +1511,7 @@ function closeSheet(bg) {
     else if (t.dataset.pc !== undefined) st.pitch = t.dataset.pc;
     else if (t.id === 'brushB') st.brush = !st.brush;
     else if (t.id === 'swRst') { delete st.swDist; delete st.swRatio; delete st.swLevel; }
-    else if (t.id === 'stReset') st = { mode: 'auto', theme: 'auto', pitch: '', brush: false, hidden: {}, anim: 1, fs: 1, cols: 1, compact: false, lock: false, lockShow: false, custom: '#2c4a9a' };
+    else if (t.id === 'stReset') st = { mode: 'auto', theme: 'auto', pitch: '', brush: false, hidden: {}, anim: 1, fs: 1, cols: 1, compact: false, lock: false, lockShow: true, custom: '#2c4a9a' };
     else return;
     save(); apply(); if (!keep) draw();
   }
