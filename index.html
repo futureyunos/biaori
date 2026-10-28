@@ -480,12 +480,14 @@ var AC = window.AudioContext || window.webkitAudioContext;
 var actx = null, waSrc = null;
 try { if (AC) actx = new AC(); } catch (e) { actx = null; }
 try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}    /* keep sound on with the ring/silent switch on */
+var waStats = { rebuild: 0, fallback: 0, frozen: 0 }, waNeedRebuild = false;   /* shown at the bottom of 点读声音 in settings */
 function waState() {
   if (actx && actx.state !== 'running' && !document.hidden) waUnlock();
 }
 if (actx) actx.onstatechange = waState;
 function waUnlock() {
   if (!actx) return;
+  if (waNeedRebuild) { waNeedRebuild = false; waRebuild(); return; }
   try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}
   if (actx.state !== 'running') { try { var p = actx.resume(); if (p && p.catch) p.catch(function () {}); } catch (e) {} }
   if (!actx._u) {
@@ -512,6 +514,7 @@ function waRebuild() {
   try { if (old) { old.onstatechange = null; old.close(); } } catch (e) {}
   actx.onstatechange = waState;
   waSrc = null;
+  waStats.rebuild++;
   waUnlock();
 }
 ['touchend', 'pointerup', 'click', 'keydown'].forEach(function (e) { document.addEventListener(e, waUnlock, { capture: true, passive: true }); });
@@ -587,7 +590,8 @@ function waStopWord() {
   if (waSrc) { const s = waSrc; waSrc = null; s.onended = null; try { s.stop(); } catch (e) {} }
 }
 function waStopAll() { waStopWord(); }
-function waWord(i, my, finish, fallback) {
+function waWord(i, my, finish, fallback0) {
+  const fallback = function () { waStats.fallback++; try { console.info('[audio] fallback to <audio>', waStats); } catch (e) {} fallback0(); };
   const e = waEntry(cur);
   if (!e || !e.wd[i]) { fallback(); return; }
   const slow = waSlow();
@@ -603,9 +607,10 @@ function waWord(i, my, finish, fallback) {
         waSrc = s;
         const t0 = actx.currentTime;
         try { s.start(0); } catch (err) { waSrc = null; fallback(); return; }
-        setTimeout(function () {                        /* the context clock is not moving: nothing is being heard */
-          if (my === token && waSrc === s && actx.currentTime <= t0) { waStopWord(); if (retry) waRebuild(); fallback(); }
-        }, 350);
+        const ctx = actx;
+        setTimeout(function () {                        /* clock never moved in 1.5 s: this context is dead; replace it on the next tap (inside the tap), leave this word alone */
+          if (ctx === actx && ctx.currentTime <= t0) { waStats.frozen++; waNeedRebuild = true; }
+        }, 1500);
       });
     };
     attempt(true);
@@ -651,7 +656,7 @@ if ('mediaSession' in navigator) {
     try { navigator.mediaSession.setActionHandler(a, null); } catch (e) {}
   });
 }
-function stopWord() { releaseMedia(wordEl); }
+function stopWord() { if (wordEl.hasAttribute('src')) releaseMedia(wordEl); }
 function playWord(url, my, finish, fallback) {
   stopWord();
   wordEl.src = url;
@@ -1458,7 +1463,8 @@ function closeSheet(bg) {
     h += '<h3>静音</h3><div class="tg-list"><label class="tg" data-mu="1"><span>静音模式（点单词不出声，隐藏喇叭、连续播放、语速）</span><input type="checkbox" class="sw-in" switch ' + (!!st.mute ? 'checked' : '') + '></label></div>';
     h += '<h3>左右滑动切课</h3><div class="tg-list"><label class="tg" data-sw="1"><span>切课后回到第一个单词（关闭则停在当前位置）</span><input type="checkbox" class="sw-in" switch ' + (st.swipeTop !== false ? 'checked' : '') + '></label></div>';
     h += '<h3>滑动灵敏度 <b class="rv" id="swLV">' + swLabel(swLevel()) + '</b></h3><input type="range" class="rg" id="swL" min="0" max="10" step="1" value="' + swLevel() + '" aria-label="滑动灵敏度"><div style="display:flex;justify-content:space-between;font-size:12px;color:var(--ink-soft);margin-top:2px"><span>不容易触发</span><span>很容易触发</span></div><div style="font-size:12px;color:var(--ink-soft);margin-top:6px">斜着滑老是不灵，就往右拉。</div><div class="st-row" style="margin-top:10px"><button type="button" class="chip" id="swRst">恢复默认灵敏度</button></div>';
-    h += '<h3>点读声音</h3><div class="seg gj-tabs">' + [['k', 'Keita(男)'], ['g', 'Google(女)']].map(function (x) { return '<button type="button" data-voice="' + x[0] + '" aria-pressed="' + (window.__voice === x[0]) + '">' + x[1] + '</button>'; }).join('') + '</div>';
+    h += '<h3>点读声音</h3><div class="seg gj-tabs">' + [['k', 'Keita(男)'], ['g', 'Google(女)']].map(function (x) { return '<button type="button" data-voice="' + x[0] + '" aria-pressed="' + (window.__voice === x[0]) + '">' + x[1] + '</button>'; }).join('') + '</div>' +
+      (window.waStats ? '<div class="wa-dbg" style="font-size:.72em;opacity:.5;margin-top:6px">音频诊断：重建 ' + waStats.rebuild + ' · 卡住 ' + waStats.frozen + ' · 改用系统播放 ' + waStats.fallback + '</div>' : '');
     h += '<h3>顶栏</h3><div class="tg-list">' + (compactAllowed() ? '<label class="tg" data-cp="1"><span>紧凑模式（顶栏一行、小按钮）</span><input type="checkbox" class="sw-in" switch ' + (!!st.compact ? 'checked' : '') + '></label>' : '') + '<label class="tg" data-lk="1"><span>显示「锁定」按钮（固定顶栏当前状态）</span><input type="checkbox" class="sw-in" switch ' + (!!st.lockShow ? 'checked' : '') + '></label></div>';
     h += '<h3>动画速度 <b class="rv" id="anV">' + (st.noanim ? '关闭' : '×' + (st.anim || 1).toFixed(1)) + '</b></h3><input type="range" class="rg" id="anR" min="0.4" max="2.4" step="0.1" value="' + (st.anim || 1) + '" ' + (st.noanim ? 'disabled' : '') + ' aria-label="动画速度"><div class="tg-list" style="margin-top:10px"><label class="tg" data-noanim="1"><span>关闭动画</span><input type="checkbox" class="sw-in" switch ' + (!!st.noanim ? 'checked' : '') + '></label></div>';
     h += '<h3>显示的按钮</h3><div class="tg-list">' + ITEMS.map(function (it) {
