@@ -687,7 +687,8 @@ function section(title) {
 function render() {
   stopAll(); rows = []; app.innerHTML = '';
   const L = LESSONS[cur - 1];
-  if (tab === 'words') { loadAudio(cur); wordAudio(0); }
+  /* decoding the lesson's audio is heavy and only needed when something is played: do it after the page is on screen, not inside the lesson switch */
+  if (tab === 'words') { const n0 = cur; setTimeout(function () { if (cur === n0) { loadAudio(n0); wordAudio(0); } }, 1000); }
   document.getElementById('hTitle').textContent = '第' + cur + '课';
   document.getElementById('lPrev').disabled = cur <= 1; document.getElementById('lNext').disabled = cur >= LESSONS.length;
   document.getElementById('hJp').textContent = L.title;
@@ -805,7 +806,16 @@ function switchLesson(n) {
   try { history.replaceState(null, '', '#l' + n); } catch (e) {}
   const app = document.getElementById('app');
   const keep = window.__keepScroll; window.__keepScroll = false; const y0 = window.scrollY;
-  const go = function () { cur = n; render(); window.scrollTo(0, keep ? y0 : 0); switching = 0; };
+  const go = function () {
+    cur = n; render(); window.scrollTo(0, keep ? y0 : 0); switching = 0;
+    if (keep && y0 > 0) {
+      /* the cards fade in one after another from the top of the list; when the page stays scrolled, start that stagger at the first card in view so nothing waits */
+      const hb = document.querySelector('header.bar'), edge = hb && !hb.classList.contains('bar-hid') ? hb.getBoundingClientRect().bottom : 0;
+      const lis = Array.prototype.slice.call(document.querySelectorAll('#app li, main li'));
+      const first = lis.findIndex(function (l) { return l.getBoundingClientRect().bottom > edge; });
+      if (first > 0) lis.forEach(function (l, k) { l.style.setProperty('--i', String(Math.max(0, k - first))); });
+    }
+  };
   if (!app.animate) { go(); return; }
   const out = app.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(-12px) scale(.985)' }], { duration: 200 * AM(), easing: 'cubic-bezier(.4,0,1,1)', fill: 'forwards' });
   out.onfinish = function () { go(); out.cancel(); };
