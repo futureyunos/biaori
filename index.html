@@ -480,6 +480,10 @@ var AC = window.AudioContext || window.webkitAudioContext;
 var actx = null, waSrc = null;
 try { if (AC) actx = new AC(); } catch (e) { actx = null; }
 try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}    /* keep sound on with the ring/silent switch on */
+function waState() {
+  if (actx && actx.state !== 'running' && !document.hidden) waUnlock();
+}
+if (actx) actx.onstatechange = waState;
 function waUnlock() {
   if (!actx) return;
   try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}
@@ -489,8 +493,29 @@ function waUnlock() {
     try { var b = actx.createBuffer(1, 1, 22050), s = actx.createBufferSource(); s.buffer = b; s.connect(actx.destination); s.start(0); } catch (e) {}
   }
 }
+/* after a lock screen or app switch iOS leaves the context suspended / interrupted; resume it (resume can hang, so give up after 400 ms) */
+function waEnsure() {
+  return new Promise(function (resolve) {
+    if (!actx) { resolve(false); return; }
+    if (actx.state === 'running') { resolve(true); return; }
+    let done = false;
+    const fin = function () { if (!done) { done = true; resolve(actx.state === 'running'); } };
+    try { const p = actx.resume(); if (p && p.then) p.then(fin, fin); } catch (e) { fin(); }
+    setTimeout(fin, 400);
+  });
+}
+/* a context that will not resume is replaced; decoded buffers are plain data and are reused */
+function waRebuild() {
+  if (!AC) return;
+  const old = actx;
+  try { actx = new AC(); } catch (e) { actx = old; return; }
+  try { if (old) { old.onstatechange = null; old.close(); } } catch (e) {}
+  actx.onstatechange = waState;
+  waSrc = null;
+  waUnlock();
+}
 ['touchend', 'pointerup', 'click', 'keydown'].forEach(function (e) { document.addEventListener(e, waUnlock, { capture: true, passive: true }); });
-document.addEventListener('visibilitychange', function () { if (!document.hidden) waUnlock(); });
+['visibilitychange', 'pageshow', 'focus'].forEach(function (e) { (e === 'focus' ? window : document).addEventListener(e, function () { if (!document.hidden) waUnlock(); }); });
 function waDecode(b64) {
   const bin = atob(b64), u8 = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
@@ -566,22 +591,29 @@ function waWord(i, my, finish, fallback) {
   const e = waEntry(cur);
   if (!e || !e.wd[i]) { fallback(); return; }
   const slow = waSlow();
-  const ready = function (buf) {
-    if (my !== token) return;
-    const go = function () {
-      if (my !== token) return;
-      waStopWord();
-      const s = actx.createBufferSource(); s.buffer = buf; s.connect(actx.destination);
-      s.onended = function () { if (waSrc === s) waSrc = null; finish(true); };
-      waSrc = s; s.start(0);
+  const play = function (buf) {
+    const attempt = function (retry) {
+      waEnsure().then(function (ok) {
+        if (my !== token) return;
+        if (!ok) { if (retry) { waRebuild(); attempt(false); } else fallback(); return; }
+        waStopWord();
+        let s;
+        try { s = actx.createBufferSource(); s.buffer = buf; s.connect(actx.destination); } catch (err) { fallback(); return; }
+        s.onended = function () { if (waSrc === s) waSrc = null; finish(true); };
+        waSrc = s;
+        const t0 = actx.currentTime;
+        try { s.start(0); } catch (err) { waSrc = null; fallback(); return; }
+        setTimeout(function () {                        /* the context clock is not moving: nothing is being heard */
+          if (my === token && waSrc === s && actx.currentTime <= t0) { waStopWord(); if (retry) waRebuild(); fallback(); }
+        }, 350);
+      });
     };
-    if (actx.state === 'running') go();
-    else { const p = actx.resume(); if (p && p.then) p.then(go, function () { if (my === token) fallback(); }); else go(); }
+    attempt(true);
   };
   waWordBuf(e, i).then(function (buf) {
-    if (!slow) { ready(buf); return; }
+    if (!slow) { play(buf); return; }
     const k = 'w' + i;
-    (e.slow[k] || (e.slow[k] = waStretch(buf, 0.7))).then(ready);
+    (e.slow[k] || (e.slow[k] = waStretch(buf, 0.7))).then(play);
   }).catch(function () { if (my === token) fallback(); });
 }
 
@@ -654,10 +686,13 @@ function speak(item, done) {
     u.onerror = function () { finish(false); };
     setTimeout(function () { if (my === token) synth.speak(u); }, 30);
   };
-  if (actx && item.t >= 0) { waWord(item.t, my, finish, tts); return; }
-  const url = wordAudio(item.t);
-  if (!url) { tts(); return; }
-  playWord(url, my, finish, tts);
+  const viaEl = function () {
+    const url = wordAudio(item.t);
+    if (!url) { tts(); return; }
+    playWord(url, my, finish, tts);
+  };
+  if (actx && item.t >= 0) { waWord(item.t, my, finish, viaEl); return; }
+  viaEl();
 }
 /* play-all with a real pause: pausing remembers the word being read, resuming starts again from that word */
 var playState = { list: null, i: 0, paused: false };
