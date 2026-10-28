@@ -336,6 +336,7 @@ body.compact header.bar .seg[aria-label="语速"] button { min-width: var(--cw);
 header.bar { will-change: transform; transition: transform var(--bd, .6s) cubic-bezier(.45,.05,.25,1), background-color calc(.35s * var(--am, 1)) ease, border-color calc(.35s * var(--am, 1)) ease; }
 .lockb { position: fixed; right: max(14px, env(safe-area-inset-right, 0px)); bottom: calc(env(safe-area-inset-bottom, 0px) + 16px); z-index: 6; width: 44px; height: 44px; padding: 0; border-radius: 50%; border: 1px solid var(--line); background: var(--bar); color: var(--ink-soft); display: grid; place-items: center; cursor: pointer; opacity: 0; visibility: hidden; pointer-events: none; transform: translate3d(0, 14px, 0) scale(.55); will-change: transform, opacity; contain: layout style; box-shadow: 0 2px 10px rgba(0,0,0,.14);
   transition: opacity calc(.3s * var(--am, 1)), transform calc(.45s * var(--am, 1)) cubic-bezier(.2,1.25,.3,1), visibility 0s calc(.45s * var(--am, 1)), background calc(.3s * var(--am, 1)), color calc(.3s * var(--am, 1)), border-color calc(.3s * var(--am, 1)); }
+body.muted .spk, body.muted #playAll, body.muted .seg[aria-label="语速"] { display: none !important; }
 .lockb.drag { box-shadow: 0 8px 26px rgba(0,0,0,.34); opacity: 1; cursor: grabbing; }
 .lockb { touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 .lockb.on { opacity: .94; visibility: visible; pointer-events: auto; transform: translate3d(0, 0, 0); transition-delay: 0s; }
@@ -497,6 +498,7 @@ function playWord(url, my, finish, fallback) {
 }
 function clearPlaying() { rows.forEach(function (r) { r.el.classList.remove('playing'); }); }
 function speak(item, done) {
+  if (document.body.classList.contains('muted')) { if (done) done(); return; }
   const my = ++token;
   stopWord();
   if (synth) synth.cancel();
@@ -655,7 +657,7 @@ function addRow(ul, o) {
     '<span class="spk">' + SPEAKER + '</span>' +
     '<span class="meaning">' + meaning + '</span>';
   const item = { say: o.say || o.kana, el: b, t: tab === 'words' ? rows.length : -1 };
-  b.addEventListener('click', function () { stopAll(); b.classList.add('revealed'); speak(item); });
+  b.addEventListener('click', function () { stopAll(); b.classList.add('revealed'); if (!document.body.classList.contains('muted')) speak(item); });
   li.appendChild(b); ul.appendChild(li); rows.push(item);
 }
 function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
@@ -1001,7 +1003,7 @@ function closeSheet(bg) {
     root.style.colorScheme = dk ? 'dark' : 'light';
     barCol = pal.bar; paintBar();
     if (window.__barSync) window.__barSync();
-    lockB.classList.toggle('on', !!st.lockShow); lockB.setAttribute('aria-pressed', String(!!st.lock)); lockB.setAttribute('aria-label', st.lock ? '解除锁定顶栏' : '锁定顶栏'); document.body.classList.toggle('lockshow', !!st.lockShow);
+    lockB.classList.toggle('on', !!st.lockShow); lockB.setAttribute('aria-pressed', String(!!st.lock)); lockB.setAttribute('aria-label', st.lock ? '解除锁定顶栏' : '锁定顶栏'); document.body.classList.toggle('lockshow', !!st.lockShow); document.body.classList.toggle('muted', !!st.mute);
     root.setAttribute('data-theme', dk ? 'dark' : 'light');
     if (st.pitch) root.style.setProperty('--pitch', visiblePitch(st.pitch)); else root.style.removeProperty('--pitch');
     document.body.classList.toggle('brush', !!st.brush);
@@ -1175,6 +1177,7 @@ function closeSheet(bg) {
       '<label class="sw-custom" id="pcCu" data-on="' + (st.pitch && PCOL.indexOf(st.pitch) < 0 ? 1 : 0) + '" style="--cc:' + (st.pitch || '#c0392b') + '" aria-label="自定义音调线颜色"><i></i><input type="color" id="pcIn" value="' + (/^#[0-9a-f]{6}$/i.test(st.pitch || '') ? st.pitch : '#c0392b') + '"></label></div>';
     h += '<h3 class="cols-h">分栏（宽屏）</h3><div class="seg gj-tabs cols-seg">' + [1, 2, 3, 4].map(function (n) { return '<button type="button" data-cols="' + n + '" aria-pressed="' + (effCols() === n) + '">' + n + ' 列</button>'; }).join('') + '</div>';
     h += '<h3>字体大小 <b class="rv" id="fsV">' + Math.round((st.fs || 1) * 100) + '%</b></h3><input type="range" class="rg" id="fsR" min="0.8" max="1.5" step="0.02" value="' + (st.fs || 1) + '" aria-label="字体大小">';
+    h += '<h3>静音</h3><div class="tg-list"><label class="tg" data-mu="1"><span>静音模式（点单词不出声，隐藏喇叭、连续播放、语速）</span><input type="checkbox" class="sw-in" switch ' + (!!st.mute ? 'checked' : '') + '></label></div>';
     h += '<h3>点读声音</h3><div class="seg gj-tabs">' + [['k', 'Keita(男)'], ['g', 'Google(女)']].map(function (x) { return '<button type="button" data-voice="' + x[0] + '" aria-pressed="' + (window.__voice === x[0]) + '">' + x[1] + '</button>'; }).join('') + '</div>';
     h += '<h3>顶栏</h3><div class="tg-list">' + (compactAllowed() ? '<label class="tg" data-cp="1"><span>紧凑模式（顶栏一行、小按钮）</span><input type="checkbox" class="sw-in" switch ' + (!!st.compact ? 'checked' : '') + '></label>' : '') + '<label class="tg" data-lk="1"><span>显示「锁定」按钮（固定顶栏当前状态）</span><input type="checkbox" class="sw-in" switch ' + (!!st.lockShow ? 'checked' : '') + '></label></div>';
     h += '<h3>动画速度 <b class="rv" id="anV">' + (st.noanim ? '关闭' : '×' + (st.anim || 1).toFixed(1)) + '</b></h3><input type="range" class="rg" id="anR" min="0.4" max="2.4" step="0.1" value="' + (st.anim || 1) + '" ' + (st.noanim ? 'disabled' : '') + ' aria-label="动画速度"><div class="tg-list" style="margin-top:10px"><label class="tg" data-noanim="1"><span>关闭动画</span><input type="checkbox" class="sw-in" switch ' + (!!st.noanim ? 'checked' : '') + '></label></div>';
@@ -1200,6 +1203,7 @@ function closeSheet(bg) {
     if (t.dataset.cols) { st.cols = Number(t.dataset.cols); }
     else if (t.dataset.noanim) { st.noanim = !st.noanim; }
     else if (t.dataset.cp) { st.compact = !st.compact; }
+    else if (t.dataset.mu) { st.mute = !st.mute; if (st.mute) stopAll(); }
     else if (t.dataset.lk) { st.lockShow = !st.lockShow; if (!st.lockShow) st.lock = false; }
     else if (t.dataset.tg) {
       const id = t.dataset.tg, hide = !st.hidden[id];
