@@ -63,6 +63,12 @@ header.bar {
 .title h1 { margin: 0; font-size: 16px; font-weight: 700; }
 /* the one lesson heading is also the lesson picker; the compact bar uses the small #lessonSel instead */
 .ttl { font: inherit; font-weight: 700; color: var(--accent); background: none; border: 0; padding: 4px 2px; margin: -4px 0; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; -webkit-tap-highlight-color: transparent; }
+.title h1 { display: inline-flex; align-items: center; gap: 4px; }
+.lnav { display: none; width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--line); background: transparent; color: var(--accent); font: inherit; font-size: 17px; line-height: 1; padding: 0 0 2px; cursor: pointer; place-items: center; }
+.lnav:disabled { opacity: .3; cursor: default; }
+@media (min-width: 880px) and (pointer: fine) { .lnav { display: inline-grid; } }
+body.swiping { -webkit-user-select: none; user-select: none; cursor: grabbing; }
+html, body { overscroll-behavior-x: none; }
 .ttl::after { content: ""; width: 6px; height: 6px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: translateY(-2px) rotate(45deg); opacity: .6; margin-left: 2px; }
 .ttl-jp { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; text-align: left; }
 body:not(.compact) #lessonSel { display: none; }
@@ -376,7 +382,7 @@ html.apple .gj .chip, html.apple .gj .seg, html.apple .gj .tg-list { background:
 <div class="wrap">
   <header class="bar">
     <div class="bar-inner">
-      <div class="title"><h1><button id="hTitle" class="ttl" type="button" aria-label="选择课次" aria-haspopup="dialog">第1课</button></h1><button id="hJp" class="jp ttl-jp" type="button" tabindex="-1" aria-hidden="true"></button><button id="tSet" class="gear" type="button" aria-label="设置"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.4a1.8 1.8 0 0 1 3.4 0l.3.9a1.8 1.8 0 0 0 2.4 1l.9-.4a1.8 1.8 0 0 1 2.4 2.4l-.4.9a1.8 1.8 0 0 0 1 2.4l.9.3a1.8 1.8 0 0 1 0 3.4l-.9.3a1.8 1.8 0 0 0-1 2.4l.4.9a1.8 1.8 0 0 1-2.4 2.4l-.9-.4a1.8 1.8 0 0 0-2.4 1l-.3.9a1.8 1.8 0 0 1-3.4 0l-.3-.9a1.8 1.8 0 0 0-2.4-1l-.9.4a1.8 1.8 0 0 1-2.4-2.4l.4-.9a1.8 1.8 0 0 0-1-2.4l-.9-.3a1.8 1.8 0 0 1 0-3.4l.9-.3a1.8 1.8 0 0 0 1-2.4l-.4-.9a1.8 1.8 0 0 1 2.4-2.4l.9.4a1.8 1.8 0 0 0 2.4-1z"/><circle cx="12" cy="12" r="3.2"/></svg></button></div>
+      <div class="title"><h1><button id="lPrev" class="lnav" type="button" aria-label="上一课" tabindex="-1">‹</button><button id="hTitle" class="ttl" type="button" aria-label="选择课次" aria-haspopup="dialog">第1课</button><button id="lNext" class="lnav" type="button" aria-label="下一课" tabindex="-1">›</button></h1><button id="hJp" class="jp ttl-jp" type="button" tabindex="-1" aria-hidden="true"></button><button id="tSet" class="gear" type="button" aria-label="设置"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.4a1.8 1.8 0 0 1 3.4 0l.3.9a1.8 1.8 0 0 0 2.4 1l.9-.4a1.8 1.8 0 0 1 2.4 2.4l-.4.9a1.8 1.8 0 0 0 1 2.4l.9.3a1.8 1.8 0 0 1 0 3.4l-.9.3a1.8 1.8 0 0 0-1 2.4l.4.9a1.8 1.8 0 0 1-2.4 2.4l-.9-.4a1.8 1.8 0 0 0-2.4 1l-.3.9a1.8 1.8 0 0 1-3.4 0l-.3-.9a1.8 1.8 0 0 0-2.4-1l-.9.4a1.8 1.8 0 0 1-2.4-2.4l.4-.9a1.8 1.8 0 0 0-1-2.4l-.9-.3a1.8 1.8 0 0 1 0-3.4l.9-.3a1.8 1.8 0 0 0 1-2.4l-.4-.9a1.8 1.8 0 0 1 2.4-2.4l.9.4a1.8 1.8 0 0 0 2.4-1z"/><circle cx="12" cy="12" r="3.2"/></svg></button></div>
       <div id="lessons" class="lessons" role="group" aria-label="课次" hidden></div>
       <div class="controls">
         <button id="lessonSel" class="chip lsel" type="button" aria-label="选择课次" aria-haspopup="dialog"></button>
@@ -683,6 +689,7 @@ function render() {
   const L = LESSONS[cur - 1];
   if (tab === 'words') { loadAudio(cur); wordAudio(0); }
   document.getElementById('hTitle').textContent = '第' + cur + '课';
+  document.getElementById('lPrev').disabled = cur <= 1; document.getElementById('lNext').disabled = cur >= LESSONS.length;
   document.getElementById('hJp').textContent = L.title;
   ['hTitle', 'hJp'].forEach(function (id, k) { const el = document.getElementById(id); if (el.animate && el.dataset.shown) el.animate([{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'none' }], { duration: 600 * AM(), delay: k * 60 * AM(), easing: 'cubic-bezier(.16,1,.3,1)', fill: 'backwards' }); el.dataset.shown = '1'; });
   if (window.__moveInd) window.__moveInd(cur, false);
@@ -1162,6 +1169,55 @@ function closeSheet(bg) {
       window.__keepScroll = st.swipeTop === false;
       switchLesson(n);
     }, { passive: true });
+    /* the same swipe with a mouse (press and drag sideways), a trackpad (two-finger sideways scroll), the arrow keys and the little arrows next to the lesson title */
+    function go(dir) {
+      const n = cur + dir;
+      if (n < 1 || n > LESSONS.length || switching) return false;
+      window.__keepScroll = st.swipeTop === false;
+      switchLesson(n); return true;
+    }
+    document.getElementById('lPrev').addEventListener('click', function () { go(-1); });
+    document.getElementById('lNext').addEventListener('click', function () { go(1); });
+    let md = false, mx = 0, my = 0, mt = 0, mlock = '', swallow = 0;
+    document.addEventListener('pointerdown', function (e) {
+      md = false; mlock = '';
+      if (e.pointerType !== 'mouse' || e.button !== 0 || blocked(e.target)) return;
+      mx = e.clientX; my = e.clientY; mt = Date.now(); md = true;
+    });
+    document.addEventListener('pointermove', function (e) {
+      if (!md) return;
+      if (!(e.buttons & 1)) { md = false; return; }
+      const dx = Math.abs(e.clientX - mx), dy = Math.abs(e.clientY - my);
+      if (!mlock && dx + dy > 10) mlock = dx >= dy * swRatio() ? 'h' : (dy > dx ? 'v' : '');
+      if (mlock === 'v') { md = false; return; }
+      if (mlock === 'h') { document.body.classList.add('swiping'); try { getSelection().removeAllRanges(); } catch (x) {} }
+    });
+    function mend(e) {
+      if (!md) return; md = false;
+      document.body.classList.remove('swiping');
+      if (mlock !== 'h') return;
+      swallow = Date.now() + 400;
+      const dx = e.clientX - mx, dy = e.clientY - my;
+      if (Date.now() - mt > 1500 || Math.abs(dx) < swDist() || Math.abs(dx) < Math.abs(dy) * swRatio()) return;
+      go(dx < 0 ? 1 : -1);
+    }
+    document.addEventListener('pointerup', mend); document.addEventListener('pointercancel', function () { md = false; document.body.classList.remove('swiping'); });
+    document.addEventListener('click', function (e) { if (Date.now() < swallow) { e.stopImmediatePropagation(); e.preventDefault(); } }, true);
+    let wacc = 0, wlast = 0, wblock = 0;
+    window.addEventListener('wheel', function (e) {
+      const now = Date.now();
+      if (Math.abs(e.deltaX) <= Math.abs(e.deltaY) * 1.2 || e.ctrlKey || document.querySelector('.gj-bg.on')) return;
+      if (now < wblock) { wblock = now + 250; return; }
+      if (now - wlast > 200) wacc = 0;
+      wlast = now; wacc += e.deltaX;
+      if (Math.abs(wacc) >= swDist() * 2.5) { const d = wacc > 0 ? 1 : -1; wacc = 0; wblock = now + 800; go(d); }
+    }, { passive: true });
+    document.addEventListener('keydown', function (e) {
+      if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+      const t = e.target, tg = t && t.tagName;
+      if (tg === 'INPUT' || tg === 'TEXTAREA' || tg === 'SELECT' || (t && t.isContentEditable) || document.querySelector('.gj-bg.on')) return;
+      if (go(e.key === 'ArrowRight' ? 1 : -1)) e.preventDefault();
+    });
   })();
   /* long-press the lock button (about 0.4 s) to drag it; the spot is remembered, a plain tap still locks */
   let lpos = null, dragged = false;
